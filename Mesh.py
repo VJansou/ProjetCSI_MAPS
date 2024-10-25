@@ -337,53 +337,53 @@ class Mesh:
 
 # #         return vertices
 
-def plot(self, title: str, zoomPoint: np.ndarray = None) -> None:
-    points = self.points
+    def plot(self, title: str, zoomPoint: np.ndarray = None) -> None:
+        points = self.points
 
-    # Nettoyer les points infiniment grands
-    while True:
-        try:
-            points.remove(np.array([-np.inf, -np.inf, -np.inf]))
-        except ValueError:
-            break
+        # Nettoyer les points infiniment grands
+        while True:
+            try:
+                points.remove(np.array([-np.inf, -np.inf, -np.inf]))
+            except ValueError:
+                break
 
-    points = np.array(points)
+        points = np.array(points)
 
-    # Si 'simplicies' contient des faces, on les utilise pour tracer les arêtes
-    faces = self.simplicies['faces']
+        # Si 'simplicies' contient des faces, on les utilise pour tracer les arêtes
+        faces = self.simplicies['faces']
 
-    # Tracer les arêtes (lignes entre les sommets)
-    edges_x = []
-    edges_y = []
-    edges_z = []
-    for face in faces:
-        for i in range(3):
-            for j in range(i + 1, 3):  # Assurez-vous de relier chaque paire de sommets
-                edges_x += [points[face[i], 0], points[face[j], 0], None]
-                edges_y += [points[face[i], 1], points[face[j], 1], None]
-                edges_z += [points[face[i], 2], points[face[j], 2], None]
+        # Tracer les arêtes (lignes entre les sommets)
+        edges_x = []
+        edges_y = []
+        edges_z = []
+        for face in faces:
+            for i in range(3):
+                for j in range(i + 1, 3):  # Assurez-vous de relier chaque paire de sommets
+                    edges_x += [points[face[i], 0], points[face[j], 0], None]
+                    edges_y += [points[face[i], 1], points[face[j], 1], None]
+                    edges_z += [points[face[i], 2], points[face[j], 2], None]
 
-    # Tracer les points
-    point_trace = go.Scatter3d(
-        x=points[:, 0], y=points[:, 1], z=points[:, 2],
-        mode='markers',
-        marker=dict(size=5),
-        name='Points'
-    )
+        # Tracer les points
+        point_trace = go.Scatter3d(
+            x=points[:, 0], y=points[:, 1], z=points[:, 2],
+            mode='markers',
+            marker=dict(size=5),
+            name='Points'
+        )
 
-    # Tracer les arêtes
-    edge_trace = go.Scatter3d(
-        x=edges_x, y=edges_y, z=edges_z,
-        mode='lines',
-        line=dict(color='black', width=2),
-        name='Arêtes'
-    )
+        # Tracer les arêtes
+        edge_trace = go.Scatter3d(
+            x=edges_x, y=edges_y, z=edges_z,
+            mode='lines',
+            line=dict(color='black', width=2),
+            name='Arêtes'
+        )
 
-    # Créer la figure
-    fig = go.Figure(data=[point_trace, edge_trace])
-    
-    # Ajout d'un titre et affichage
-    fig.update_layout(title=title)
-    fig.show()
+        # Créer la figure
+        fig = go.Figure(data=[point_trace, edge_trace])
+        
+        # Ajout d'un titre et affichage
+        fig.update_layout(title=title)
+        fig.show()
 
     
