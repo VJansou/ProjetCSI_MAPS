@@ -50,7 +50,7 @@ class HoledRegion:
         p0p1 = np.sqrt(np.sum((p0-p1)**2))
         p1p2 = np.sqrt(np.sum((p1-p2)**2))
         p0p2 = np.sqrt(np.sum((p0-p2)**2))
-        return np.acos((p0p1**2 + p0p2**2 - p1p2**2)/(2*p0p1*p0p2))
+        return np.arccos((p0p1**2 + p0p2**2 - p1p2**2)/(2*p0p1*p0p2))
     
     def getFacesCentralAngles(self) -> np.ndarray:
         # Calculer les angles centraux de chaque face
