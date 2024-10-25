@@ -59,115 +59,147 @@ class MapsModel(obja.Model):
 
         return finestMesh
     
-    """
-        Étant donné une liste d'arrête, retourne la même liste sans les arrêtes présentent deux fois dans des sens différents.
-        Exemple:
-            input = [[1,2],[3,4],[2,1],[5,4]]
-            output = [[3,4],[2,1],[5,4]]
+    def facesToList(self):
+        listFaces = []
+        for face in self.faces:
+            listFace = sorted([face.a, face.b, face.c])
+            listFaces.append(tuple(listFace))
+        self.faces = listFaces
+        return self.faces
+    
+    def createEdgesList(self):
+        self.edges = set()
+        for face in self.faces:
+            self.edges.add((face[0], face[1]))
+            self.edges.add((face[0], face[2]))
+            self.edges.add((face[1], face[2]))
+        self.edges = list(self.edges)
+        return self.edges
+    
+    def createNeighborsDict(self):
+        self.neighbors = {}
+        for edge in self.edges:
+            self.neighbors.setdefault(edge[0], []).append(edge[1])
+            self.neighbors.setdefault(edge[1], []).append(edge[0])
+        return self.neighbors
+    
+    def get1RingExternalEdges(self,centralVertex:int) -> List[List[int]]:
+
+        facesWithCentralVertex = self.getFacesWithVertex(vertexId=centralVertex)
+        externalEdges = []
+
+        for face in facesWithCentralVertex:
+            externalEdges.append(tuple(vertex for vertex in face if vertex != centralVertex))
         
-        Args: edges:List[List[int]], la liste des arrêtes de départ
+        return externalEdges
+    
+    #"""
+    #    Étant donné une liste d'arrête, retourne la même liste sans les arrêtes présentent deux fois dans des sens différents.
+    #    Exemple:
+    #        input = [[1,2],[3,4],[2,1],[5,4]]
+    #        output = [[3,4],[2,1],[5,4]]
+    #    
+    #    Args: edges:List[List[int]], la liste des arrêtes de départ
+#
+    #    Return: List[List[int]], la liste des arrêtes finales sans les doublons
+#
+    #"""
+    #def removeDoubleEdges(self,edges:List[List[int]]) -> List[List[int]]:
+    #    for edge in edges:
+    #        try:
+    #            reversedEdge = edge.copy()
+    #            reversedEdge.reverse()
+    #            edges.remove(reversedEdge)
+    #        except ValueError:
+    #            pass
+    #    return edges
 
-        Return: List[List[int]], la liste des arrêtes finales sans les doublons
+    def getEdgesWithVertex(self,vertexId):
+        edges = []
+        for vertex in self.neighbors[vertexId]:
+            if vertex < vertexId:
+                edges.append((vertex, vertexId))
+            else:
+                edges.append((vertexId, vertex))
 
-    """
-    def removeDoubleEdges(self,edges:List[List[int]]) -> List[List[int]]:
-        for edge in edges:
-            try:
-                reversedEdge = edge.copy()
-                reversedEdge.reverse()
-                edges.remove(reversedEdge)
-            except ValueError:
-                pass
         return edges
+    
+    def getFacesWithVertex(self, vertexId):
+        faces = set()
+        neighbors = self.neighbors[vertexId]
+        for neighbor in neighbors:
+            subNeighbors = self.neighbors[neighbor]
+            for subNeighbor in subNeighbors:
+                if subNeighbor in neighbors:
+                    face = sorted([vertexId, neighbor, subNeighbor])
+                    faces.add(tuple(face))
+        return list(faces)
 
-    def getEdgesWithVertex(self,vertexId,edgesList):
-        flattenEdges = np.ravel(np.array(edgesList))
-        flattenEdges = flattenEdges.tolist()
-
-        indices = []
-        start = 0
-        allIndicesFound = False
-
-        while not allIndicesFound:
-            try:
-                index = flattenEdges.index(vertexId,start)
-                indices.append(index)
-                start = index+1
-            except ValueError:
-                allIndicesFound = True
-
-        indices = np.array(indices)
-        indices = (indices//2).tolist()
-
-        edgesInCyclicOrder = [edgesList[i] for i in indices]
-
-        return edgesInCyclicOrder
-
-    def getFacesFromEdges(self,edgesList):
-
-        vertices = np.unique(np.ravel(np.array(edgesList))).tolist()
-
-        faces = []
-
-        for vertex in vertices:
-
-            # print('vertex : ',vertex)
-            
-            edgesCollection = self.getEdgesWithVertex(vertex,edgesList)
-            
-            for edge in edgesCollection:
-                # print(edge)
-                if edge[0] != vertex: edge.reverse()
-
-            # print('--- edges collection : ',edgesCollection)
-
-            for edge in edgesCollection:
-                
-                # print('--- --- edge in edgesCollection : ',edge)
-
-                nextEdgesCollection = self.getEdgesWithVertex(edge[1],edgesList)
-                nextEdgesCollection.remove(edge)
-
-                # print('--- --- next edges collection : ',nextEdgesCollection)
-
-                coupleEdgesCollection = []
-
-                for nextEdge in nextEdgesCollection:
-                    if nextEdge[0] != edge[1]:
-                        nextEdge.reverse()
-                    coupleEdgesCollection.append([edge,nextEdge])
-
-                # print('--- --- couple edges collection : ',coupleEdgesCollection)
-
-                for edgesCouple in coupleEdgesCollection:
-
-                    # print('--- --- --- edges couple : ',edgesCouple)
-
-                    missingEdge = [edgesCouple[0][0],edgesCouple[1][1]]
-
-                    # print('--- --- --- missing edges : ',missingEdge)
-
-                    isPresent = False
-
-                    if missingEdge not in edgesList:
-                        missingEdge.reverse()
-                        if missingEdge in edgesList:
-                            isPresent = True
-                    else:
-                        isPresent = True
-
-                    # print('--- --- --- isPresent : ',isPresent)
-
-                    if isPresent:
-                        newFace = list(set([edgesCouple[0][0],edgesCouple[0][1],edgesCouple[1][1]])) 
-                        newFace.sort()
-                        if newFace not in faces:
-                            faces.append(newFace)
-                            # print(faces)
-
-                    isPresent = False
-            # break
-        return faces
+#    def getFacesFromEdges(self,edgesList):
+#
+#        vertices = np.unique(np.ravel(np.array(edgesList))).tolist()
+#
+#        faces = []
+#
+#        for vertex in vertices:
+#
+#            # print('vertex : ',vertex)
+#            
+#            edgesCollection = self.getEdgesWithVertex(vertex,edgesList)
+#            
+#            for edge in edgesCollection:
+#                # print(edge)
+#                if edge[0] != vertex: edge.reverse()
+#
+#            # print('--- edges collection : ',edgesCollection)
+#
+#            for edge in edgesCollection:
+#                
+#                # print('--- --- edge in edgesCollection : ',edge)
+#
+#                nextEdgesCollection = self.getEdgesWithVertex(edge[1],edgesList)
+#                nextEdgesCollection.remove(edge)
+#
+#                # print('--- --- next edges collection : ',nextEdgesCollection)
+#
+#                coupleEdgesCollection = []
+#
+#                for nextEdge in nextEdgesCollection:
+#                    if nextEdge[0] != edge[1]:
+#                        nextEdge.reverse()
+#                    coupleEdgesCollection.append([edge,nextEdge])
+#
+#                # print('--- --- couple edges collection : ',coupleEdgesCollection)
+#
+#                for edgesCouple in coupleEdgesCollection:
+#
+#                    # print('--- --- --- edges couple : ',edgesCouple)
+#
+#                    missingEdge = [edgesCouple[0][0],edgesCouple[1][1]]
+#
+#                    # print('--- --- --- missing edges : ',missingEdge)
+#
+#                    isPresent = False
+#
+#                    if missingEdge not in edgesList:
+#                        missingEdge.reverse()
+#                        if missingEdge in edgesList:
+#                            isPresent = True
+#                    else:
+#                        isPresent = True
+#
+#                    # print('--- --- --- isPresent : ',isPresent)
+#
+#                    if isPresent:
+#                        newFace = list(set([edgesCouple[0][0],edgesCouple[0][1],edgesCouple[1][1]])) 
+#                        newFace.sort()
+#                        if newFace not in faces:
+#                            faces.append(newFace)
+#                            # print(faces)
+#
+#                    isPresent = False
+#            # break
+#        return faces
 
     def computeArea(self,p0:np.ndarray,p1:np.ndarray,p2:np.ndarray) -> np.ndarray:
         base = p1 - p0
