@@ -14,6 +14,9 @@ class MapsModel(obja.Model):
     def __init__(self,L):
         super().__init__()
         self.L = L
+        self.facesToList()
+        self.createEdgesList()
+        self.createNeighborsDict()
 
     """
         Retourne le maillage associé à un modèle déduit d'un fichier .obj
@@ -31,31 +34,8 @@ class MapsModel(obja.Model):
             finestMesh.points.append(coordonates)
             finestMesh.simplicies['vertices'].append(index)
 
-        # Liste qui contiendra les arrêtes du maillage sous la forme d'une liste [ [id du premier sommet , id du seconde sommet] ... ]
-        edges = []
-        # Pour remplir cette liste on effectue un parcours sur les faces du modèle
-        for face in self.faces:
-
-            if (not [face.a,face.b,face.c] in finestMesh.simplicies['faces'] and 
-                not [face.a,face.c,face.b] in finestMesh.simplicies['faces'] and
-                not [face.b,face.a,face.c] in finestMesh.simplicies['faces'] and
-                not [face.b,face.c,face.a] in finestMesh.simplicies['faces'] and
-                not [face.c,face.a,face.b] in finestMesh.simplicies['faces'] and
-                not [face.c,face.b,face.a] in finestMesh.simplicies['faces']):
-
-                finestMesh.simplicies['faces'].append([face.a,face.b,face.c])
-                edge1 = [face.a,face.b]
-                edge2 = [face.b,face.c]
-                edge3 = [face.a,face.c]
-                edges.append(edge1)
-                edges.append(edge2)
-                edges.append(edge3)
-
-        # On supprime les doublon en passant par un np.ndarray
-        edges = np.unique(np.array(edges),axis=0).tolist()
-        edges = self.removeDoubleEdges(edges=edges)
-
-        finestMesh.simplicies['edges'] = edges
+        finestMesh.simplicies['faces'] = self.list_faces
+        finestMesh.simplicies['edges'] = self.edges
 
         return finestMesh
     
@@ -64,12 +44,12 @@ class MapsModel(obja.Model):
         for face in self.faces:
             listFace = sorted([face.a, face.b, face.c])
             listFaces.append(tuple(listFace))
-        self.faces = listFaces
-        return self.faces
+        self.list_faces = listFaces
+        return self.list_faces
     
     def createEdgesList(self):
         self.edges = set()
-        for face in self.faces:
+        for face in self.list_faces:
             self.edges.add((face[0], face[1]))
             self.edges.add((face[0], face[2]))
             self.edges.add((face[1], face[2]))
@@ -93,26 +73,35 @@ class MapsModel(obja.Model):
         
         return externalEdges
     
-    #"""
-    #    Étant donné une liste d'arrête, retourne la même liste sans les arrêtes présentent deux fois dans des sens différents.
-    #    Exemple:
-    #        input = [[1,2],[3,4],[2,1],[5,4]]
-    #        output = [[3,4],[2,1],[5,4]]
-    #    
-    #    Args: edges:List[List[int]], la liste des arrêtes de départ
-#
-    #    Return: List[List[int]], la liste des arrêtes finales sans les doublons
-#
-    #"""
-    #def removeDoubleEdges(self,edges:List[List[int]]) -> List[List[int]]:
-    #    for edge in edges:
-    #        try:
-    #            reversedEdge = edge.copy()
-    #            reversedEdge.reverse()
-    #            edges.remove(reversedEdge)
-    #        except ValueError:
-    #            pass
-    #    return edges
+    def getExternalEdgesInCyclicOrder(self,vertexId:int) -> List[int]:
+
+        isBorderVertex = False
+        edgesInOrder = []
+        edges = self.get1RingExternalEdges(vertexId)
+        neighbors = {}
+        for edge in edges:
+            neighbors.setdefault(edge[0], []).append(edge[1])
+            neighbors.setdefault(edge[1], []).append(edge[0])
+
+        currentVertex = next((vertex for vertex, neighborList in neighbors.items() if len(neighborList) == 1), None)
+        if currentVertex is None:
+            if len(edges) > 0:
+                currentVertex = edges[0][0]
+        else:
+            isBorderVertex = True
+        
+        edgesInOrder.append(currentVertex)
+        while True:
+            neighborList = neighbors[currentVertex]
+            nextVertex = next((v for v in neighborList if v not in edgesInOrder), None)
+            if nextVertex is None:  
+                break
+            
+            edgesInOrder.append(nextVertex)
+            currentVertex = nextVertex
+
+        return edgesInOrder, isBorderVertex
+    
 
     def getEdgesWithVertex(self,vertexId):
         edges = []
@@ -134,72 +123,7 @@ class MapsModel(obja.Model):
                     face = sorted([vertexId, neighbor, subNeighbor])
                     faces.add(tuple(face))
         return list(faces)
-
-#    def getFacesFromEdges(self,edgesList):
-#
-#        vertices = np.unique(np.ravel(np.array(edgesList))).tolist()
-#
-#        faces = []
-#
-#        for vertex in vertices:
-#
-#            # print('vertex : ',vertex)
-#            
-#            edgesCollection = self.getEdgesWithVertex(vertex,edgesList)
-#            
-#            for edge in edgesCollection:
-#                # print(edge)
-#                if edge[0] != vertex: edge.reverse()
-#
-#            # print('--- edges collection : ',edgesCollection)
-#
-#            for edge in edgesCollection:
-#                
-#                # print('--- --- edge in edgesCollection : ',edge)
-#
-#                nextEdgesCollection = self.getEdgesWithVertex(edge[1],edgesList)
-#                nextEdgesCollection.remove(edge)
-#
-#                # print('--- --- next edges collection : ',nextEdgesCollection)
-#
-#                coupleEdgesCollection = []
-#
-#                for nextEdge in nextEdgesCollection:
-#                    if nextEdge[0] != edge[1]:
-#                        nextEdge.reverse()
-#                    coupleEdgesCollection.append([edge,nextEdge])
-#
-#                # print('--- --- couple edges collection : ',coupleEdgesCollection)
-#
-#                for edgesCouple in coupleEdgesCollection:
-#
-#                    # print('--- --- --- edges couple : ',edgesCouple)
-#
-#                    missingEdge = [edgesCouple[0][0],edgesCouple[1][1]]
-#
-#                    # print('--- --- --- missing edges : ',missingEdge)
-#
-#                    isPresent = False
-#
-#                    if missingEdge not in edgesList:
-#                        missingEdge.reverse()
-#                        if missingEdge in edgesList:
-#                            isPresent = True
-#                    else:
-#                        isPresent = True
-#
-#                    # print('--- --- --- isPresent : ',isPresent)
-#
-#                    if isPresent:
-#                        newFace = list(set([edgesCouple[0][0],edgesCouple[0][1],edgesCouple[1][1]])) 
-#                        newFace.sort()
-#                        if newFace not in faces:
-#                            faces.append(newFace)
-#                            # print(faces)
-#
-#                    isPresent = False
-#            # break
-#        return faces
+    
 
     def computeArea(self,p0:np.ndarray,p1:np.ndarray,p2:np.ndarray) -> np.ndarray:
         base = p1 - p0

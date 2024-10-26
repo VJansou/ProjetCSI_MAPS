@@ -21,5 +21,7 @@ print('\n')
 print(model.getFacesWithVertex(3))
 print('\n')
 print(model.get1RingExternalEdges(3))
+print('\n')
+print(model.getExternalEdgesInCyclicOrder(3)[0])
 
 

@@ -22,18 +22,6 @@ class Mesh:
             self.neighbors.setdefault(edge[1], []).append(edge[0])
         return self.neighbors
 
-    def removeDoubleEdges(self) -> None:
-        edges:List[List[int]] = self.simplicies['edges'].copy()
-
-        for edge in edges:
-            try:
-                reversedEdge = edge.copy()
-                reversedEdge.reverse()
-                edges.remove(reversedEdge)
-            except ValueError:
-                pass
-
-        self.simplicies['edges'] = edges.copy()
 
     """
         Retourne le nombre de voisin d'un sommet du maillage ( = card(1-Ring) ).
@@ -43,7 +31,7 @@ class Mesh:
         Returns : int, le nombre de voisins.
     """
     def getNumberOfNeighbors(self,vertexId:int) -> int:
-        return self.neighbors[vertexId]
+        return len(self.neighbors[vertexId])
     
     """
         Retourne la liste des arrêtes du maillage contenant un certain sommet.
@@ -53,7 +41,7 @@ class Mesh:
         Returns : List[List[int]], la liste des arrêtes, une arrête étant une liste de deux entiers : 
                     les indices associés aux deux sommets de l'arrête.
     """
-    def getEdgesWithVertex(self,vertexId:int) -> List[List[int]]:
+    def getEdgesWithVertex(self,vertexId):
         edges = []
         for vertex in self.neighbors[vertexId]:
             if vertex < vertexId:
@@ -82,15 +70,15 @@ class Mesh:
                     les indices associés trois aux sommets de la face.
     """
     def getFacesWithVertex(self, vertexId):
-        faces = []
+        faces = set()
         neighbors = self.neighbors[vertexId]
         for neighbor in neighbors:
             subNeighbors = self.neighbors[neighbor]
             for subNeighbor in subNeighbors:
                 if subNeighbor in neighbors:
                     face = sorted([vertexId, neighbor, subNeighbor])
-                    faces.append(face)
-        return faces
+                    faces.add(tuple(face))
+        return list(faces)
     
     """
         Retourne la liste des arrêtes extérieures du 1-ring d'un sommet.
@@ -107,7 +95,7 @@ class Mesh:
 
         for face in facesWithCentralVertex:
             externalEdges.append(tuple(vertex for vertex in face if vertex != centralVertex))
-
+        
         return externalEdges
 
     """
@@ -118,19 +106,35 @@ class Mesh:
         Returns : List[List[int]], la liste des arrêtes, une arrête étant une liste de deux entiers : 
                     les indices associés aux deux sommets de l'arrête.
     """
-    # ATTENTION : Cette fonction ne fonctionne pas pour les sommets centraux sur la frontiere du maillage
     def getExternalEdgesInCyclicOrder(self,vertexId:int) -> List[int]:
 
+        isBorderVertex = False
         edgesInOrder = []
         edges = self.get1RingExternalEdges(vertexId)
         neighbors = {}
         for edge in edges:
-            neighbors[edge[0]] = edge[1]
-            neighbors[edge[1]] = edge[0]
-        if len(edges) > 0:
-            edgesInOrder.append(edges[0][0])
-            while(neighbors[edgesInOrder[-1]] in neighbors):
+            neighbors.setdefault(edge[0], []).append(edge[1])
+            neighbors.setdefault(edge[1], []).append(edge[0])
 
+        currentVertex = next((vertex for vertex, neighborList in neighbors.items() if len(neighborList) == 1), None)
+        if currentVertex is None:
+            if len(edges) > 0:
+                currentVertex = edges[0][0]
+        else:
+            isBorderVertex = True
+        
+        edgesInOrder.append(currentVertex)
+        while True:
+            neighborList = neighbors[currentVertex]
+            nextVertex = next((v for v in neighborList if v not in edgesInOrder), None)
+            if nextVertex is None:  
+                break
+            
+            edgesInOrder.append(nextVertex)
+            currentVertex = nextVertex
+
+        return edgesInOrder, isBorderVertex
+                
 
 
     
@@ -141,93 +145,6 @@ class Mesh:
         
         Returns : None
     """
-#     def plot(self,title:str,zoomPoint:np.ndarray=None) -> None:
-
-#         points = self.points
-
-#         bool = True
-
-#         while bool:
-#             try:
-#                 points.remove(np.array([-np.inf,-np.inf,-np.inf]))
-#             except ValueError:
-#                 bool = False
-
-#         points = np.array(points)
-
-#         plt.triplot(points[:,0], points[:,1], self.simplicies['faces'])
-
-#         # Tracer les points
-#         # plt.plot(points[:,0], points[:,1], 'o')
-#         fig = go.Figure(go.Scatter3d(x=points[:,0], y=points[:,1], z=points[:,2], mode='markers', marker=dict(size=5)))
-#         fig.show()
-
-#         # if points.shape[0]==8:
-#         #     a_supprimer = [222,225,227,220,133,131,129,71]
-#         # elif points.shape[0]==7:
-#         #     a_supprimer = [225,227,220,133,131,129,71]
-
-#         # # Ajouter les numéros des sommets
-#         # for i, (x, y, z) in enumerate(self.points):
-#         #     if x != -np.inf:
-#         #         plt.text(x, y, str(i), fontsize=12, color='red')  # Position et numéro des sommets # a_supprimer[i] -> i
-
-#         # plt.title(title)
-
-#         # if zoomPoint is not None:
-#         #         plt.axis([zoomPoint[0]-0.15, zoomPoint[0]+0.15, zoomPoint[1]-0.15, zoomPoint[1]+0.15])
-
-#         # # Afficher la figure
-#         # plt.savefig(title+'.png')
-#         # plt.show()
-
-#     def copy(self):
-#         meshCopy:Mesh = Mesh(stepNum=self.stepNum)
-#         meshCopy.points = self.points.copy()
-#         meshCopy.simplicies['vertices'] = self.simplicies['vertices'].copy()
-#         meshCopy.simplicies['edges'] = self.simplicies['edges'].copy()
-#         meshCopy.simplicies['faces'] = self.simplicies['faces'].copy()
-#         return meshCopy
-
-# # def getNeighborsInCyclicOrder(self,externalEdges:List[List[int]]) -> List[int]:
-        
-# #         externalEdges = 
-
-# #         rearangedExternalEdges:List[List[int]] = [externalEdges[0]]
-
-# #         i = 1
-
-# #         while i < len(externalEdges):
-# #             # print('ITERATOIN ',i)
-# #             # print(rearangedExternalEdges)
-# #             complementaryEdgeFound = False
-# #             j = 0
-# #             # print('len(externalEdges) = ',len(externalEdges))
-# #             while j < len(externalEdges) and not complementaryEdgeFound:
-# #                 # print('j = ',j)
-# #                 edge = externalEdges[j]
-# #                 if edge not in rearangedExternalEdges:
-# #                     # print('a')
-# #                     # print('edge = ',edge)
-# #                     if edge[0] == rearangedExternalEdges[i-1][1]:
-# #                         # print('b')
-# #                         rearangedExternalEdges.append(edge)
-# #                         complementaryEdgeFound = True
-# #                     elif edge[1] == rearangedExternalEdges[i-1][1]:
-# #                         # print('c')
-# #                         edge.reverse()
-# #                         rearangedExternalEdges.append(edge)
-# #                         complementaryEdgeFound = True
-# #                 j = j + 1
-
-# #             if complementaryEdgeFound:
-# #                 i = i+1
-# #             else:
-# #                 rearangedExternalEdges[i-1].reverse()
-
-# #         vertices = [edge[0] for edge in rearangedExternalEdges]
-
-# #         return vertices
 
 def plot(self, title: str, zoomPoint: np.ndarray = None) -> None:
     points = self.points

@@ -1,5 +1,7 @@
 import numpy as np
 import MapsModel
+
+from Mesh import Mesh
 from typing import List
 def main():
     """
