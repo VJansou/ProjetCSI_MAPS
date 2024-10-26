@@ -3,6 +3,8 @@ import MapsModel
 
 from Mesh import Mesh
 from typing import List
+import decimate
+
 def main():
     """
     Runs the program on the model given as parameter.
@@ -32,7 +34,14 @@ def main():
 
     for mesh in meshHierarchy:
         mesh.plot(title='level '+str(mesh.stepNum))
+    
+    back2model = meshHierarchy[-1].mesh2Model()
 
+    model = decimate.Decimater()
+    model.parse_file('example/suzanne.obj')
+
+    with open('example/suzanneeeeeez.obja', 'w+') as output:
+        model.contract(output)
     # print(finestMesh.simplicies['faces'][:5])
     # print(model.faces[:5])
 

@@ -128,6 +128,7 @@ class MapsModel(obja.Model):
     def computeArea(self,p0:np.ndarray,p1:np.ndarray,p2:np.ndarray) -> np.ndarray:
         base = p1 - p0
         milieu_segment = (p0 + p1)/2
+        
         hauteur = p2 - milieu_segment
         return np.linalg.norm(np.cross(base,hauteur)) / 2
     
@@ -213,6 +214,7 @@ class MapsModel(obja.Model):
 
         # Pour chaque étape
         for l in range(numStep-1,-1,-1):
+            
 
             verticesToRemove = self.getVerticesToRemove(mesh=currentMesh,maxNeighborsNum = maxNeighborsNum )
 
@@ -340,13 +342,48 @@ class MapsModel(obja.Model):
                     currentMesh.simplicies['faces'].append(face)
 
                 # TEST : on regarde les points suppr.
-                currentMesh.plot(f"loupe n° {l} nb sommets  {len(verticesToRemove)} ")
+                #currentMesh.plot(f"loupe n° {l} nb sommets  {len(verticestoremove)} ")
+                
                 #i = i + 1
+            
 
-
-            # On ajoute le maillage obtenu à la hierarchie des maillages
+            # on ajoute le maillage obtenu à la hierarchie des maillages
             meshHierarchy.append(currentMesh.copy())
 
             testVerticesIndex = testVerticesIndex + 1
 
         return meshHierarchy
+    
+
+    def mesh2model(self, mesh: Mesh) -> obja.Model:
+        # création d'un nouveau modèle
+        model = obja.Model()
+        
+        # ajouter les sommets du maillage au modèle
+        model.vertices = [point for point in mesh.points if not np.array_equal(point, np.array([-np.inf, -np.inf, -np.inf]))]
+        
+        # créer un dictionnaire pour conserver l'indexation des sommets (afin de gérer les points supprimés)
+        index_mapping = {}
+        index_counter = 0
+        for i, point in enumerate(mesh.points):
+            if not np.array_equal(point, np.array([-np.inf, -np.inf, -np.inf])):
+                index_mapping[i] = index_counter
+                index_counter += 1
+        
+        # ajouter les faces en utilisant la nouvelle indexation
+        model.faces = []
+        for face in mesh.simplicies['faces']:
+            # remap les indices de sommet pour chaque face
+            new_face = [index_mapping[vertex] for vertex in face if vertex in index_mapping]
+            if len(new_face) == 3:
+                model.faces.append(new_face)
+        
+        # mise en forme des arrêtes du maillage
+        model.edges = []
+        for edge in mesh.simplicies['edges']:
+            # Remap les indices de sommet pour chaque arrête
+            new_edge = [index_mapping[vertex] for vertex in edge if vertex in index_mapping]
+            if len(new_edge) == 2:
+                model.edges.append(new_edge)
+
+        return model
