@@ -15,25 +15,25 @@ def main():
 
     finestMesh = model.model2Mesh()
 
-    # neighbors = finestMesh.getNeighborsInCyclicOrder(vertexId=3)
-    # print('neighbors = ',neighbors)
 
-    # print('POINTS')
-    # print(finestMesh.points)
-    # print('EDGES')
-    # print(finestMesh.simplicies['edges'])
-    # print('FACES')
-    # print(finestMesh.simplicies['faces'])
-    # print('VERTICES')
-    # print(finestMesh.simplicies['vertices'])
+    #print('POINTS')
+    #print(finestMesh.points)
+    #print('EDGES')
+    #print(finestMesh.simplicies['edges'])
+    #print('FACES')
+    #print(finestMesh.simplicies['faces'])
+    #print('NEIGHBORS')
+    #print(finestMesh.neighbors)
+    #print('VERTICES')
+    #print(finestMesh.simplicies['vertices'])
 
-    # model.getRetriangulation(mesh=finestMesh,vertexToRemove=0)
+    #model.getRetriangulation(mesh=finestMesh,vertexToRemove=0)
 
-    meshHierarchy:List[Mesh] = model.getMeshHierarchy(initialMesh=finestMesh,maxNeighborsNum= 54)
+    meshHierarchy:List[Mesh] = model.getMeshHierarchy(initialMesh=finestMesh,maxNeighborsNum= 12)
 
-
+    #print(meshHierarchy)
     for mesh in meshHierarchy:
-        mesh.plot(title='level '+str(mesh.stepNum))
+        mesh.plot(title='level '+str(mesh.currentStep))
     
     back2model = meshHierarchy[-1].mesh2Model()
 

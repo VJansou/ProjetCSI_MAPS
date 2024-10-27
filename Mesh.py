@@ -3,23 +3,27 @@ import matplotlib.pyplot as plt
 import numpy as np
 import plotly.graph_objects as go
 import pandas as pd
+import copy
 
 class Mesh:
     def __init__(self,stepNum:int):
         self.stepNum = stepNum
+        self.currentStep = stepNum
         self.points:List[np.ndarray] = []
         self.simplicies:Dict[List[int]] = {'vertices':[],'edges':[],'faces':[]}
         self.neighbors = {}
     
     def copy(self):
         # Créer une copie de l'objet Mesh
-        return Mesh(self.stepNum)  # Remplace par une copie réelle des attributs de Mesh
+        return copy.deepcopy(self)  # Remplace par une copie réelle des attributs de Mesh
     
     def createNeighborsDict(self):
         self.neighbors = {}
-        for edge in self.edges:
-            self.neighbors.setdefault(edge[0], []).append(edge[1])
-            self.neighbors.setdefault(edge[1], []).append(edge[0])
+        for vertex in self.simplicies['vertices']:
+            self.neighbors[vertex] = []
+        for edge in self.simplicies['edges']:
+            self.neighbors[edge[0]].append(edge[1])
+            self.neighbors[edge[1]].append(edge[0])
         return self.neighbors
 
 
@@ -31,6 +35,10 @@ class Mesh:
         Returns : int, le nombre de voisins.
     """
     def getNumberOfNeighbors(self,vertexId:int) -> int:
+        #print(vertexId)
+        #print("neigh = ")
+        #print(self.neighbors[vertexId])
+        #print('\n')
         return len(self.neighbors[vertexId])
     
     """
@@ -43,6 +51,7 @@ class Mesh:
     """
     def getEdgesWithVertex(self,vertexId):
         edges = []
+        #print(self.neighbors)
         for vertex in self.neighbors[vertexId]:
             if vertex < vertexId:
                 edges.append((vertex, vertexId))
@@ -106,7 +115,7 @@ class Mesh:
         Returns : List[List[int]], la liste des arrêtes, une arrête étant une liste de deux entiers : 
                     les indices associés aux deux sommets de l'arrête.
     """
-    def getExternalEdgesInCyclicOrder(self,vertexId:int) -> List[int]:
+    def getExternalVerticesInCyclicOrder(self,vertexId:int):
 
         isBorderVertex = False
         edgesInOrder = []
@@ -172,6 +181,8 @@ class Mesh:
                     edges_y += [points[face[i], 1], points[face[j], 1], None]
                     edges_z += [points[face[i], 2], points[face[j], 2], None]
 
+        #print("POINTS")
+        #print(points)
         # Tracer les points
         point_trace = go.Scatter3d(
             x=points[:, 0], y=points[:, 1], z=points[:, 2],
