@@ -35,13 +35,12 @@ def main():
     for mesh in meshHierarchy:
         mesh.plot(title='level '+str(mesh.currentStep))
     
-    back2model = meshHierarchy[-1].mesh2Model()
-
-    model = decimate.Decimater()
-    model.parse_file('example/suzanne.obj')
+    back2model = meshHierarchy[-1].mesh2model()
+    # model = decimate.Decimater()
+    # model.parse_file('example/suzanne.obj')
 
     with open('example/suzanneeeeeez.obja', 'w+') as output:
-        model.contract(output)
+        back2model.contract(output)
     # print(finestMesh.simplicies['faces'][:5])
     # print(model.faces[:5])
 

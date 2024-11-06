@@ -4,6 +4,8 @@ import numpy as np
 import plotly.graph_objects as go
 import pandas as pd
 import copy
+import obja
+import decimate
 
 class Mesh:
     def __init__(self,stepNum:int):
@@ -206,4 +208,39 @@ class Mesh:
         fig.update_layout(title=title)
         fig.show()
 
-    
+    def mesh2model(self) -> decimate.Decimater:
+        # création d'un nouveau modèle
+        model = decimate.Decimater()
+        
+        # ajouter les sommets du maillage au modèle
+        model.vertices = [point for point in self.points if not np.array_equal(point, np.array([-np.inf, -np.inf, -np.inf]))]
+        
+        # créer un dictionnaire pour conserver l'indexation des sommets (afin de gérer les points supprimés)
+        # index_mapping = {}
+        # index_counter = 0
+        # for i, point in enumerate(mesh.points):
+        #     if not np.array_equal(point, np.array([-np.inf, -np.inf, -np.inf])):
+        #         index_mapping[i] = index_counter
+        #         index_counter += 1
+        
+        # ajouter les faces en utilisant la nouvelle indexation
+        # model.faces = []
+        # for face in mesh.simplicies['faces']:
+        #     # remap les indices de sommet pour chaque face
+        #     new_face = [index_mapping[vertex] for vertex in face if vertex in index_mapping]
+        #     if len(new_face) == 3:
+        #         model.faces.append(new_face)
+        model.faces = []
+        for face in self.simplicies['faces']:
+            model.faces.append(obja.Face(a=face[0], b=face[1], c=face[2]))
+        
+        model.line = len(model.vertices) + len(model.faces)
+        # # mise en forme des arrêtes du maillage
+        # model.edges = []
+        # for edge in mesh.simplicies['edges']:
+        #     # Remap les indices de sommet pour chaque arrête
+        #     new_edge = [index_mapping[vertex] for vertex in edge if vertex in index_mapping]
+        #     if len(new_edge) == 2:
+        #         model.edges.append(new_edge)
+
+        return model
