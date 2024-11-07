@@ -284,7 +284,7 @@ class MapsModel(obja.Model):
 
                 # Récupérer la liste des voisins de v
 
-                selectedVertexNeighbors = currentMesh.getNeighbors(vertexId=vertexToRemove)
+                selectedVertexNeighbors = currentMesh.getNeighbors(vertexId=vertexToRemove).copy()
 
                 # Marquer les sommets voisins comme "non-supprimable" et les supprimer de la liste des sommets "supprimables"
                 # for vertexId in selectedVertexNeighbors:
@@ -301,12 +301,9 @@ class MapsModel(obja.Model):
                 # boucle un peu long mais il y'a t'il mieux ?
 
                 #la disparition est bien ici
-                Liste_Point_A_Supp.append(vertexToRemove)
-
-                Liste_Point_A_Supp.append(selectedVertexNeighbors)
+                selectedVertexNeighbors.append(vertexToRemove)
 
                 # Supprimer les arrêtes auxquelles appartient v
-                verticesToRemove.remove(vertexToRemove)
                 verticesToRemove = [v for v in verticesToRemove if v not in selectedVertexNeighbors]
 
                 edgesWithSelectedVertex = currentMesh.getEdgesWithVertex(vertexId=vertexToRemove)
@@ -337,7 +334,8 @@ class MapsModel(obja.Model):
 
                 currentMesh.neighbors[vertexToRemove] = []
                 for vertex in selectedVertexNeighbors:
-                    currentMesh.neighbors[vertex].remove(vertexToRemove)
+                    if vertex != vertexToRemove:
+                        currentMesh.neighbors[vertex].remove(vertexToRemove)
 
                 
             #currentMesh.plot(title='level '+str(l))
