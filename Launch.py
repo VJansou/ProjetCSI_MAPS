@@ -15,7 +15,6 @@ def main():
 
     finestMesh = model.model2Mesh()
 
-
     #print('POINTS')
     #print(finestMesh.points)
     #print('EDGES')
@@ -32,12 +31,13 @@ def main():
     meshHierarchy:List[Mesh] = model.getMeshHierarchy(initialMesh=finestMesh,maxNeighborsNum= 12)
 
     #print(meshHierarchy)
-    for mesh in meshHierarchy:
-        mesh.plot(title='level '+str(mesh.currentStep))
+    # for mesh in meshHierarchy:
+    #     mesh.plot(title='level '+str(mesh.currentStep))
     
     back2model = meshHierarchy[-1].mesh2model()
     # model = decimate.Decimater()
     # model.parse_file('example/suzanne.obj')
+    print("Avant compression : ",len(finestMesh.simplicies['vertices']))
 
     with open('example/suzanneeeeeez.obja', 'w+') as output:
         back2model.contract(output)

@@ -213,8 +213,9 @@ class Mesh:
         model = decimate.Decimater()
         
         # ajouter les sommets du maillage au modèle
-        model.vertices = [point for point in self.points if not np.array_equal(point, np.array([-np.inf, -np.inf, -np.inf]))]
-        
+        model.vertices = [point for point in self.points]# if not np.array_equal(point, np.array([-np.inf, -np.inf, -np.inf]))]
+        print("vertices",model.vertices)
+        print("taille vertices",len(model.vertices))
         # créer un dictionnaire pour conserver l'indexation des sommets (afin de gérer les points supprimés)
         # index_mapping = {}
         # index_counter = 0
@@ -231,7 +232,15 @@ class Mesh:
         #     if len(new_face) == 3:
         #         model.faces.append(new_face)
         model.faces = []
+        print("nombre de faces",len(self.simplicies['faces']))
+        i = 0
+        vrai = True
         for face in self.simplicies['faces']:
+            if vrai:
+                i+=1
+                if face[1] == 252:
+                    vrai = False
+            print(f"face n{i}",face)
             model.faces.append(obja.Face(a=face[0], b=face[1], c=face[2]))
         
         model.line = len(model.vertices) + len(model.faces)
