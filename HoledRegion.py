@@ -112,6 +112,32 @@ class HoledRegion:
 
         return forbiddenEdges
     
+    # Compute barycentric coordinates (u, v, w) for
+    # vertex with respect to triangle (a, b, c) using Cramer's rule
+    def getBarycentricCoords(self, vertex, a, b, c):
+        # Calculate vectors
+        v0 = b - a
+        v1 = c - a
+        v2 = vertex - a
+        
+        # Compute dot products
+        d00 = np.dot(v0, v0)
+        d01 = np.dot(v0, v1)
+        d11 = np.dot(v1, v1)
+        d20 = np.dot(v2, v0)
+        d21 = np.dot(v2, v1)
+        
+        # Calculate the denominator
+        denom = d00 * d11 - d01 * d01
+        
+        # Calculate barycentric coordinates
+        gamma = (d11 * d20 - d01 * d21) / denom
+        beta = (d00 * d21 - d01 * d20) / denom
+        alpha = 1.0 - beta - gamma
+        
+        return alpha, beta, gamma
+    
+
     def isPointInPolygon(self, point, polygon):
         """Check if a point is inside a polygon using the ray-casting algorithm."""
         x, y = point
