@@ -184,7 +184,7 @@ class MapsModel(obja.Model):
 
         return areas,maxArea,curvatures,maxCurvature
 
-    def getVerticesToRemove(self,mesh:Mesh,maxNeighborsNum:int=12,_lambda:float= 1/2) -> List[int]:
+    def getVerticesToRemove(self,mesh:Mesh,maxNeighborsNum:int=12,_lambda:float= 1/2, threshold_curv = np.pi/4) -> List[int]:
 
         # print("Vertices to remove computation")
         
@@ -201,9 +201,9 @@ class MapsModel(obja.Model):
         supressionOrder = []
         
         for indx,vertex in enumerate(selectedVertices):
-
-            weight = _lambda * areas[indx,0]/maxArea + (1-_lambda) * curvatures[indx,0]/maxCurvature
-            supressionOrder.append([vertex,weight])
+            if curvatures[indx,0] > threshold_curv:
+                weight = _lambda * areas[indx,0]/maxArea + (1-_lambda) * curvatures[indx,0]/maxCurvature
+                supressionOrder.append([vertex,weight])
 
         supressionOrder.sort(key=lambda x: x[1],reverse=True)
 
