@@ -14,26 +14,24 @@ class HoledRegion:
 
         self.isBoundary = False
 
-        if self.vertexToRemove == 222 or self.vertexToRemove == 129:
-            self.mesh.plot('',zoomPoint=self.mesh.points[self.vertexToRemove])
+        #if self.vertexToRemove == 222 or self.vertexToRemove == 129:
+        #    self.mesh.plot('',zoomPoint=self.mesh.points[self.vertexToRemove])
 
-        self.starEdges:List[int] = self.mesh.getExternalEdgesInCyclicOrder(vertexId=self.vertexToRemove)
+        self.starEdges = self.mesh.get1RingExternalEdges(self.vertexToRemove).copy()
+
+        res = self.mesh.getExternalVerticesInCyclicOrder(vertexId=self.vertexToRemove)
+        self.starVertices = res[0].copy()
+        self.isBoundary = res[1]
         # print('star edges = ',self.starEdges)
 
-        if vertexToRemove==222:
-            print('starEdges = ',self.starEdges)
+        #if vertexToRemove==222:
+        #    print('starEdges = ',self.starEdges)
 
         # print('AFTER getExternalEdgesInCyclicOrder')
 
-        # Si centralVertex est un sommet de la frontière
-        if self.starEdges[0][0] != self.starEdges[-1][1] and len(self.starEdges) > 1:
-            self.starEdges.append([self.starEdges[-1][1],self.starEdges[0][0]])
-            self.isBoundary = True
 
-        self.starVertices = [edge[0] for edge in self.starEdges]
-
-        if vertexToRemove==222:
-            print('star vertices : ',self.starVertices)
+        #if vertexToRemove==222:
+        #    print('star vertices : ',self.starVertices)
     
     """
         Étant donné trois points 3D p0, p1 et p2, retourne la valeur de l'angle (p0p1,p0p2)
@@ -76,14 +74,14 @@ class HoledRegion:
 
         angles = angles[::-1,:]
 
-        polarCoordonates = np.zeros((2,len(self.starEdges)))
+        polarCoordonates = np.zeros((2,len(self.starVertices)))
 
         p_i = self.mesh.points[self.vertexToRemove]
         if self.vertexToRemove==222:print('ordre de parcours :')
         # Pour chaque sommet de N(i) en partant de j_k = j_1
-        for k in range(0,len(self.starEdges)): #len(N_i)):
-            if self.vertexToRemove==222:print("sommet ",k," ",self.starEdges[k][0])
-            p_j_k = self.mesh.points[self.starEdges[k][0]]
+        for k in range(0,len(self.starVertices)): #len(N_i)):
+            if self.vertexToRemove==222:print("sommet ",k," ",self.starVertices[k])
+            p_j_k = self.mesh.points[self.starVertices[k]]
             # Calculer et stocker r_k
             polarCoordonates[0,k] = np.sqrt(np.sum((p_i-p_j_k)**2))
             # Calculer et stocker theta_k
@@ -113,67 +111,234 @@ class HoledRegion:
                         forbiddenEdges.append(edge)
 
         return forbiddenEdges
+    
+    # Compute barycentric coordinates (u, v, w) for
+    # vertex with respect to triangle (a, b, c) using Cramer's rule
+    def getBarycentricCoords(self, vertex, a, b, c):
+        # Calculate vectors
+        v0 = b - a
+        v1 = c - a
+        v2 = vertex - a
+        
+        # Compute dot products
+        d00 = np.dot(v0, v0)
+        d01 = np.dot(v0, v1)
+        d11 = np.dot(v1, v1)
+        d20 = np.dot(v2, v0)
+        d21 = np.dot(v2, v1)
+        
+        # Calculate the denominator
+        denom = d00 * d11 - d01 * d01
+        
+        # Calculate barycentric coordinates
+        gamma = (d11 * d20 - d01 * d21) / denom
+        beta = (d00 * d21 - d01 * d20) / denom
+        alpha = 1.0 - beta - gamma
+        
+        return alpha, beta, gamma
+    
 
+    def isPointInPolygon(self, point, polygon):
+        """Check if a point is inside a polygon using the ray-casting algorithm."""
+        x, y = point
+        n = len(polygon)
+        inside = False
+
+        p1x, p1y = polygon[0]
+        for i in range(n + 1):
+            p2x, p2y = polygon[i % n]
+
+            if y > min(p1y, p2y):
+                if y <= max(p1y, p2y):
+                    if x <= max(p1x, p2x):
+
+                        if p1y != p2y:
+                            xinters = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
+
+                        if p1x == p2x or x <= xinters:
+                            inside = not inside
+
+            p1x, p1y = p2x, p2y
+
+        return inside
+    
+    def calculateInternalAngle(self, i, polygon):
+
+        num_vertices = len(polygon)
+            
+        # Get the previous, current, and next vertex
+        p1 = np.array(polygon[i - 1])  # Previous vertex
+        p2 = np.array(polygon[i])      # Current vertex
+        p3 = np.array(polygon[(i + 1) % num_vertices])  # Next vertex
+        
+        # Create vectors from the vertices
+        vector_a = p1 - p2  # Vector from current to previous
+        vector_b = p3 - p2  # Vector from current to next
+
+        # Calculate the angle using the dot product
+        dot_product = np.dot(vector_a, vector_b)
+        magnitude_a = np.linalg.norm(vector_a)
+        magnitude_b = np.linalg.norm(vector_b)
+
+        # Calculate the angle in radians
+        angle_radians = np.arccos(dot_product / (magnitude_a * magnitude_b))
+
+        # Convert angle to degrees
+        angle_degrees = np.degrees(angle_radians)
+
+        # Calculate the barycenter of the triangle formed by p1, p2, p3
+        barycenter = (p1 + p2 + p3) / 3
+
+        # Check if the barycenter is inside the polygon
+        if self.isPointInPolygon(barycenter, polygon):
+            return angle_degrees  # Angle is internal
+        else:
+            return 360 - angle_degrees  # Angle is external
+
+    def calculateInternalAngles(self, polygon):
+        angles = []
+        num_vertices = len(polygon)
+
+        for i in range(num_vertices):
+            angles.append(self.calculateInternalAngle(i, polygon))
+
+        return angles
+    
+    def plotPolygonWithAngles(self, polygon, angles):
+        # Convert the polygon to a numpy array for easy plotting
+        polygon = np.array(polygon)
+        
+        # Create a figure and axis
+        fig, ax = plt.subplots()
+
+        # Plot the polygon
+        ax.plot(*np.append(polygon, [polygon[0]], axis=0).T, 'b-', label='Polygon')  # Close the polygon by adding the first point again
+
+        # Annotate angles at each vertex
+        for i, angle in enumerate(angles):
+            # Get the vertex position
+            vertex = polygon[i]
+            
+            # Position for the angle text
+            ax.text(vertex[0], vertex[1], f'{angle:.1f}°', fontsize=12, ha='center', va='bottom')
+
+        # Set equal aspect ratio
+        ax.set_aspect('equal')
+        ax.set_title('Polygon with Internal Angles')
+        ax.set_xlabel('X-axis')
+        ax.set_ylabel('Y-axis')
+        ax.grid()
+        ax.legend()
+        
+        plt.show()
+    
     def getNewSimplices(self) -> Tuple[List[List[int]],List[List[int]]]:
 
         newEdges = []
         newFaces = []
 
         if len(self.starEdges) > 1:
+            if self.isBoundary:
+                boundaryEdge = tuple(sorted([self.starVertices[0], self.starVertices[-1]]))
+                if boundaryEdge not in self.starEdges:
+                    self.starEdges.append(boundaryEdge)
+                    newEdges.append(boundaryEdge)
+            # We now have a cyclic star whether the vertex to remove is on the border or not
+            points = self.getConformalMap().T.tolist()
+            internalAngles = self.calculateInternalAngles(points)
+            #self.plotPolygonWithAngles(points, internalAngles)
+            
+            while(len(points) > 3):
+                angles = np.array(internalAngles)
 
-            forbiddenEdges:List[List[int]] = self.getForbiddenEdges()
+                sortedAnglesIdx = np.argsort(angles)
+                
+                indexToModify = sortedAnglesIdx[0]
 
-            if self.vertexToRemove == 222:
-                print('forbidden edges : ',forbiddenEdges)
+                nbVertices = len(self.starVertices)
+                newEdges.append(tuple(sorted([self.starVertices[indexToModify-1], self.starVertices[(indexToModify+1)%nbVertices]])))
+                newFaces.append(tuple(sorted([self.starVertices[indexToModify-1], self.starVertices[(indexToModify%nbVertices)], self.starVertices[(indexToModify+1)%nbVertices]])))
 
-            points = self.getConformalMap()
-            points = points.T
-            tri = Delaunay(points=points)
+                del points[indexToModify]
+                del internalAngles[indexToModify]
+                del self.starVertices[indexToModify]
 
-            if self.vertexToRemove==222:
-                plt.triplot(points[:,0], points[:,1], tri.simplices)
+                nbPointsRestant = len(points)
+                internalAngles[indexToModify%nbPointsRestant] = self.calculateInternalAngle(indexToModify%nbPointsRestant, points)
+                internalAngles[indexToModify-1] = self.calculateInternalAngle(indexToModify-1, points)
 
-                # Tracer les points
-                plt.plot(points[:,0], points[:,1], 'o')
 
-                # Ajouter les numéros des sommets
-                for i, (x, y) in enumerate(points):
-                    if x != -np.inf:
-                        plt.text(x, y, str(i), fontsize=12, color='red')  # Position et numéro des sommets # a_supprimer[i] -> i
+                #self.plotPolygonWithAngles(points, internalAngles)
+            print(self.starVertices)
+            newFaces.append(tuple(sorted([self.starVertices[0], self.starVertices[1], self.starVertices[2]])))
 
-                # Afficher la figure
-                plt.show()
+        return newEdges, newFaces
+                
 
-            for _face in tri.simplices:
 
-                face = [self.starVertices[int(_face[0])],self.starVertices[int(_face[1])],self.starVertices[int(_face[2])]]
+            
 
-                if self.vertexToRemove == 222:
-                    print("new faces : ", face)
-
-                # On ajoute les nouvelles arrêtes
-                newEdgesInFace = [[face[0],face[1]],[face[0],face[2]],[face[1],face[2]]]
-
-                unforbiddenEdges = 0
-
-                for edge in newEdgesInFace:
-                    if edge not in forbiddenEdges:
-                        edge.reverse()
-                        if edge not in forbiddenEdges:
-                            edge.reverse()
-                            unforbiddenEdges = unforbiddenEdges + 1
-
-                if unforbiddenEdges == 3:
-                    newFaces.append(face)
-
-                for edge in newEdgesInFace:
-                    if edge not in forbiddenEdges and edge not in self.mesh.simplicies['edges']:
-                        edge.reverse()
-                        if edge not in forbiddenEdges and edge not in self.mesh.simplicies['edges']:
-                            edge.reverse()
-                            newEdges.append(edge)
-
-        return newEdges,newFaces
+        
+#   def getNewSimplices(self) -> Tuple[List[List[int]],List[List[int]]]:
+#
+#       newEdges = []
+#       newFaces = []
+#
+#       if len(self.starEdges) > 1:
+#
+#           forbiddenEdges:List[List[int]] = self.getForbiddenEdges()
+#
+#           if self.vertexToRemove == 222:
+#               print('forbidden edges : ',forbiddenEdges)
+#
+#           points = self.getConformalMap()
+#           points = points.T
+#           tri = Delaunay(points=points)
+#
+#           if self.vertexToRemove==222:
+#               plt.triplot(points[:,0], points[:,1], tri.simplices)
+#
+#               # Tracer les points
+#               plt.plot(points[:,0], points[:,1], 'o')
+#
+#               # Ajouter les numéros des sommets
+#               for i, (x, y) in enumerate(points):
+#                   if x != -np.inf:
+#                       plt.text(x, y, str(i), fontsize=12, color='red')  # Position et numéro des sommets # a_supprimer[i] -> i
+#
+#               # Afficher la figure
+#               plt.show()
+#
+#           for _face in tri.simplices:
+#
+#               face = [self.starVertices[int(_face[0])],self.starVertices[int(_face[1])],self.starVertices[int(_face[2])]]
+#
+#               if self.vertexToRemove == 222:
+#                   print("new faces : ", face)
+#
+#               # On ajoute les nouvelles arrêtes
+#               newEdgesInFace = [[face[0],face[1]],[face[0],face[2]],[face[1],face[2]]]
+#
+#               unforbiddenEdges = 0
+#
+#               for edge in newEdgesInFace:
+#                   if edge not in forbiddenEdges:
+#                       edge.reverse()
+#                       if edge not in forbiddenEdges:
+#                           edge.reverse()
+#                           unforbiddenEdges = unforbiddenEdges + 1
+#
+#               if unforbiddenEdges == 3:
+#                   newFaces.append(face)
+#
+#               for edge in newEdgesInFace:
+#                   if edge not in forbiddenEdges and edge not in self.mesh.simplicies['edges']:
+#                       edge.reverse()
+#                       if edge not in forbiddenEdges and edge not in self.mesh.simplicies['edges']:
+#                           edge.reverse()
+#                           newEdges.append(edge)
+#
+#       return newEdges,newFaces
     
 # hr = HoledRegion(vertexToRemove=129,mesh=self.mesh.copy())
 #                 pointsbis = hr.getConformalMap().T
