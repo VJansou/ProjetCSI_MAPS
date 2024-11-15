@@ -184,6 +184,12 @@ class MapsModel(obja.Model):
 
         return areas,maxArea,curvatures,maxCurvature
 
+    def computevertexfeatureedge(self,mesh:Mesh):
+
+        for vertex in mesh.simplicies["vertices"]:
+            edges = mesh.getEdgesWithVertex(vertex)
+            
+
     def getVerticesToRemove(self,mesh:Mesh,maxNeighborsNum:int=12,_lambda:float= 1/2, threshold_curv = np.pi/4) -> List[int]:
 
         # print("Vertices to remove computation")
