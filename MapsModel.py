@@ -193,6 +193,78 @@ class MapsModel(obja.Model):
             edges = mesh.getEdgesWithVertex(vertex)
             
 
+    def calculate_normal(self,v1, v2, v3):
+        """
+        Calcule la normale d'une face triangulaire définie par 3 sommets.
+        """
+
+        u = np.array(v2) - np.array(v1)
+        v = np.array(v3) - np.array(v1)
+        
+        # Produit vectoriel pour obtenir la normale
+        normal = np.cross(u, v)
+        
+        # Normalisation
+        norm = np.linalg.norm(normal)
+        if norm == 0:
+            return np.array([0, 0, 0])  # Cas dégénéré (points colinéaires)
+        
+        return normal / norm
+
+    def dihedral_angle(self,normal1, normal2, shared_edge_vector):
+        """
+        Calcule l'angle dièdre entre deux normales et le vecteur de l'arête partagée.
+        """
+
+        shared_edge_vector = shared_edge_vector / np.linalg.norm(shared_edge_vector)
+        
+
+        cos_theta = np.dot(normal1, normal2)
+        cos_theta = np.clip(cos_theta, -1.0, 1.0)  # Éviter les erreurs numériques hors [-1, 1]
+        
+
+        angle = np.arccos(cos_theta)
+        
+        # On calcule un vecteur "binormal" pour déterminer si l'angle est obtus ou aigu
+        cross_product = np.cross(normal1, normal2)
+        orientation = np.dot(cross_product, shared_edge_vector)
+        
+        if orientation < 0:
+            
+            angle = -angle
+        
+        return angle
+
+    def get_face_from_edge(self,edge):
+        faces = []
+        compteur = 0
+        for face in self.liste_faces:
+            if edge[0] in face and edge[1] in face and compteur < 2:
+                faces.append(face)
+                compteur += 1
+
+        return faces
+    # obtenir l'angle des normales des faces d'une edge
+    def calcul_diedre(self,edge):
+
+        
+        faces = self.get_face_from_edge(edge)
+        diedre = -inf
+        if len(faces) == 2:
+            normal1 = self.calculate_normal(self.vertices[faces[0][0]], self.vertices[faces[0][1]], self.vertices[faces[0][2]])
+            normal2 = self.calculate_normal(self.vertices[faces[1][0]], self.vertices[faces[1][1]], self.vertices[faces[1][2]])
+            shared_edge_vector = self.vertices[edge[1]] - self.vertices[edge[0]]
+            diedre = self.dihedral_angle(normal1, normal2, shared_edge_vector)
+
+        return diedre
+    # selopn l'oangle considere comme unremovable
+    def feature_ou_pas(self,ind_edge,edge, threshold_angle = np.pi/4):
+        diedre = self.calcul_diedre(edge)
+        if diedre > threshold_angle:
+            self.status_edges[ind_edge] = 0
+            
+
+
     def getVerticesToRemove(self,mesh:Mesh,maxNeighborsNum:int=12,_lambda:float= 1/2, threshold_curv = np.pi/4) -> List[int]:
 
         # print("Vertices to remove computation")
@@ -204,7 +276,20 @@ class MapsModel(obja.Model):
                 nbNeighbors:int = mesh.getNumberOfNeighbors(vertex)
                 if nbNeighbors <= maxNeighborsNum and nbNeighbors > 0:
                     selectedVertices.append(vertex)
+        ##gerer les feature edges
+
+        for ind_edge,edge in enumerate(mesh.simplicies['edges']):
+            self.feature_ou_pas(ind_edge,edge)
+            # 1 = removable, 0 = unremovable
+            if self.status_edges[ind_edge] == 0:
+                if edge[0] in selectedVertices:
+                    selectedVertices.remove(edge[0])
+                if edge[1] in selectedVertices:
+                    selectedVertices.remove(edge[1])
+
+
         #print(selectedVertices)
+
         areas,maxArea,curvatures,maxCurvature = self.getAreasAndCurvatures(mesh=mesh,selectedVertices=selectedVertices)
 
         supressionOrder = []
