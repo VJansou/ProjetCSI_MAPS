@@ -17,10 +17,13 @@ class MapsModel(obja.Model):
     def __init__(self,L):
         super().__init__()
         self.L = L
+        self.liste_faces = self.facesToList()
+        self.edges = self.createEdgesList()
 
     def parse_file(self, path):
         super().parse_file(path)
         self.facesToList()
+        
         self.createEdgesList()
         self.createNeighborsDict()
 
