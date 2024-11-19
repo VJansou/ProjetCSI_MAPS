@@ -22,6 +22,14 @@ class HoledRegion:
         res = self.mesh.getExternalVerticesInCyclicOrder(vertexId=self.vertexToRemove)
         self.starVertices = res[0].copy()
         self.isBoundary = res[1]
+
+        if vertexToRemove == 132:
+            print("star of 132 : ",self.starVertices)
+
+            print(vertexToRemove," neighbors : ",mesh.neighbors[vertexToRemove])
+            for neighbor in mesh.neighbors[vertexToRemove]:
+                print("           ",neighbor," neighbors : ",mesh.neighbors[neighbor])
+
         # print('star edges = ',self.starEdges)
 
         #if vertexToRemove==222:
@@ -77,10 +85,10 @@ class HoledRegion:
         polarCoordonates = np.zeros((2,len(self.starVertices)))
 
         p_i = self.mesh.points[self.vertexToRemove]
-        if self.vertexToRemove==222:print('ordre de parcours :')
+        
         # Pour chaque sommet de N(i) en partant de j_k = j_1
         for k in range(0,len(self.starVertices)): #len(N_i)):
-            if self.vertexToRemove==222:print("sommet ",k," ",self.starVertices[k])
+            
             p_j_k = self.mesh.points[self.starVertices[k]]
             # Calculer et stocker r_k
             polarCoordonates[0,k] = np.sqrt(np.sum((p_i-p_j_k)**2))
@@ -214,7 +222,7 @@ class HoledRegion:
         if len(self.starEdges) > 1:
             if self.isBoundary:
                 boundaryEdge = tuple(sorted([self.starVertices[0], self.starVertices[-1]]))
-                if boundaryEdge not in self.starEdges:
+                if boundaryEdge not in self.starEdges: # a priori inutile
                     self.starEdges.append(boundaryEdge)
                     newEdges.append(boundaryEdge)
             # We now have a cyclic star whether the vertex to remove is on the border or not
@@ -233,6 +241,9 @@ class HoledRegion:
                 newEdges.append(tuple(sorted([self.starVertices[indexToModify-1], self.starVertices[(indexToModify+1)%nbVertices]])))
                 newFaces.append(tuple(sorted([self.starVertices[indexToModify-1], self.starVertices[(indexToModify%nbVertices)], self.starVertices[(indexToModify+1)%nbVertices]])))
 
+                if self.vertexToRemove == 132:
+                    print("new face add to newFaces :",newFaces[-1])
+
                 del points[indexToModify]
                 del internalAngles[indexToModify]
                 del self.starVertices[indexToModify]
@@ -241,9 +252,9 @@ class HoledRegion:
                 internalAngles[indexToModify%nbPointsRestant] = self.calculateInternalAngle(indexToModify%nbPointsRestant, points)
                 internalAngles[indexToModify-1] = self.calculateInternalAngle(indexToModify-1, points)
 
-
-                #self.plotPolygonWithAngles(points, internalAngles)
-            print(self.starVertices)
+                # if self.vertexToRemove==74:
+                #     self.plotPolygonWithAngles(points, internalAngles)
+            # print(self.starVertices)
             newFaces.append(tuple(sorted([self.starVertices[0], self.starVertices[1], self.starVertices[2]])))
 
         return newEdges, newFaces

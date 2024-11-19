@@ -304,13 +304,25 @@ class Output:
         Adds a face to the model.
         """
         self.face_mapping[index] = len(self.face_mapping)
-        print('f {} {} {}'.format(
-            self.vertex_mapping[face.a] + 1,
-            self.vertex_mapping[face.b] + 1,
-            self.vertex_mapping[face.c] + 1,
-        ),
-            file=self.output
-        )
+
+        try:
+
+            print('f {} {} {}'.format(
+                self.vertex_mapping[face.a] + 1,
+                self.vertex_mapping[face.b] + 1,
+                self.vertex_mapping[face.c] + 1,
+            ),
+                file=self.output
+            )
+
+        except KeyError as e:
+            if e.args[0] == 103:
+                # print(self.vertex_mapping)
+                print("a = ",face.a)
+                print("b = ",face.b)
+                print("c = ",face.c)
+            
+            raise e
 
         if self.random_color:
             print('fc {} {} {} {}'.format(

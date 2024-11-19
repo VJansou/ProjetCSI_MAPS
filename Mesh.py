@@ -2,7 +2,7 @@ from typing import List,Dict
 import matplotlib.pyplot as plt
 import numpy as np
 import plotly.graph_objects as go
-import pandas as pd
+# import pandas as pd
 import copy
 import obja
 import decimate
@@ -81,14 +81,26 @@ class Mesh:
                     les indices associés trois aux sommets de la face.
     """
     def getFacesWithVertex(self, vertexId):
+        # faces = set()
+        # neighbors = self.neighbors[vertexId]
+        # # if vertexId==103:
+        # #     print("neighbors of",vertexId," ",neighbors)
+        # for neighbor in neighbors:
+        #     subNeighbors = self.neighbors[neighbor]
+        #     for subNeighbor in subNeighbors:
+        #         if subNeighbor in neighbors:
+        #             face = sorted([vertexId, neighbor, subNeighbor])
+        #             faces.add(tuple(face))
+        # return list(faces)
+
         faces = set()
-        neighbors = self.neighbors[vertexId]
-        for neighbor in neighbors:
-            subNeighbors = self.neighbors[neighbor]
-            for subNeighbor in subNeighbors:
-                if subNeighbor in neighbors:
-                    face = sorted([vertexId, neighbor, subNeighbor])
-                    faces.add(tuple(face))
+        for face in self.simplicies['faces']:
+            if face[0] == vertexId or face[1] == vertexId or face[2] == vertexId:
+                # if np.inf in self.points[face[0]] or np.inf in self.points[face[0]] or np.inf in self.points[face[0]]:
+                #     print("face problematique ",face)
+                #     input()
+                face = sorted(face)
+                faces.add(tuple(face))
         return list(faces)
     
     """
@@ -145,10 +157,7 @@ class Mesh:
             currentVertex = nextVertex
 
         return edgesInOrder, isBorderVertex
-                
-
-
-    
+                   
     """
         Affiche dans une fenêtre de matplotlib le maillage. La figure affiché est une figure 2D
 
@@ -214,8 +223,8 @@ class Mesh:
         
         # ajouter les sommets du maillage au modèle
         model.vertices = [point for point in self.points]# if not np.array_equal(point, np.array([-np.inf, -np.inf, -np.inf]))]
-        print("vertices",model.vertices)
-        print("taille vertices",len(model.vertices))
+        # print("vertices",model.vertices)
+        # print("taille vertices",len(model.vertices))
         # créer un dictionnaire pour conserver l'indexation des sommets (afin de gérer les points supprimés)
         # index_mapping = {}
         # index_counter = 0
@@ -232,7 +241,7 @@ class Mesh:
         #     if len(new_face) == 3:
         #         model.faces.append(new_face)
         model.faces = []
-        print("nombre de faces",len(self.simplicies['faces']))
+        # print("nombre de faces",len(self.simplicies['faces']))
         i = 0
         vrai = True
         for face in self.simplicies['faces']:
@@ -240,7 +249,7 @@ class Mesh:
                 i+=1
                 if face[1] == 252:
                     vrai = False
-            print(f"face n{i}",face)
+            # print(f"face n{i}",face)
             model.faces.append(obja.Face(a=face[0], b=face[1], c=face[2]))
         
         model.line = len(model.vertices) + len(model.faces)

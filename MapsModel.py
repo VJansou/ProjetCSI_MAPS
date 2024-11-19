@@ -24,7 +24,6 @@ class MapsModel(obja.Model):
         self.createEdgesList()
         self.createNeighborsDict()
 
-
     """
         Retourne le maillage associé à un modèle déduit d'un fichier .obj
 
@@ -41,7 +40,10 @@ class MapsModel(obja.Model):
             finestMesh.points.append(coordonates)
             finestMesh.simplicies['vertices'].append(index)
 
-        finestMesh.simplicies['faces'] = self.list_faces
+        finestMesh.simplicies['faces'] = list(set(sorted(self.list_faces)))
+        # print("Initial faces : ")
+        # for (index,face) in enumerate(finestMesh.simplicies['faces']):
+        #     print(index," ",face)
         finestMesh.simplicies['edges'] = self.edges
         finestMesh.neighbors = self.neighbors
 
@@ -52,8 +54,8 @@ class MapsModel(obja.Model):
         for face in self.faces:
             listFace = sorted([face.a, face.b, face.c])
             listFaces.append(tuple(listFace))
-        self.list_faces = listFaces
-        return self.list_faces
+        self.list_faces = list(set(sorted(listFaces)))
+        # return list(set(sorted(self.list_faces)))
     
     def createEdgesList(self):
         self.edges = set()
@@ -112,7 +114,6 @@ class MapsModel(obja.Model):
 
         return edgesInOrder, isBorderVertex
     
-
     def getEdgesWithVertex(self,vertexId):
         edges = []
         for vertex in self.neighbors[vertexId]:
@@ -134,14 +135,16 @@ class MapsModel(obja.Model):
                     faces.add(tuple(face))
         return list(faces)
     
-
     def computeArea(self,p0:np.ndarray,p1:np.ndarray,p2:np.ndarray) -> np.ndarray:
+        # print("p0 = ",p0)
+        # print("p1 = ",p1)
+        # print("p2 = ",p2)
         base = p1 - p0
         milieu_segment = (p0 + p1)/2
         
         hauteur = p2 - milieu_segment
-        #print(base)
-        #print(hauteur)
+        # print(base)
+        # print(hauteur)
         return np.linalg.norm(np.cross(base,hauteur)) / 2
     
     def computeCurvature(self,p0:np.ndarray,p1:np.ndarray,p2:np.ndarray) -> float:
@@ -168,6 +171,8 @@ class MapsModel(obja.Model):
             starCurvature = 0
 
             for face in facesWithVertex:
+                if -np.inf in mesh.points[face[0]] or -np.inf in mesh.points[face[1]] or -np.inf in mesh.points[face[2]]:
+                    print(face)
                 starArea = starArea + self.computeArea(p0=mesh.points[face[0]],p1=mesh.points[face[1]],p2=mesh.points[face[2]])
                 face_copy = list(face)
                 face_copy.remove(vertex)
@@ -215,112 +220,71 @@ class MapsModel(obja.Model):
         Étant donné un maillage de départ, retourne la liste des maillages jusqu'au "Domain Base".
     """
     def getMeshHierarchy(self,initialMesh:Mesh,maxNeighborsNum = 12) -> List[Mesh]:
+
+        # initialMesh.simplicies['faces'] = sorted(initialMesh.simplicies['faces'])
+        # for face in initialMesh.simplicies['faces']:
+        #     print(face)
+        # input()
         
         numStep:int = initialMesh.stepNum
 
         # Liste des maillages obtenues après les simplifications successives
         meshHierarchy:List[Mesh] = [initialMesh.copy()]
+
         currentMesh:Mesh = initialMesh
 
-        #testVerticesList = [[3],[15,0]] #[[12,14],[9,3]]
-        #testVerticesIndex = 0
-        
-        #currentMesh.plot(title='level '+str(numStep-1))
+        operations = []
+
         # Pour chaque étape
         for l in range(numStep-1,-1,-1):
+
+            # if l == 0:
+            #     print("At l == 0, faces with 474",currentMesh.getFacesWithVertex(474))
+
             currentMesh.currentStep = l
-            verticesToRemove = self.getVerticesToRemove(mesh=currentMesh,maxNeighborsNum = maxNeighborsNum )
-            
-            # Filter keys with a list length greater than N
-            #filtered_keys = {key: value for key, value in currentMesh.neighbors.items() if len(value) > maxNeighborsNum}
-            #print("vertices with more than max neighbors")
-            #print(filtered_keys)
-            #print('\n')
-#
-            #print('##############################################################')
-            #print('Mesh oooo', len(currentMesh.simplicies['vertices']))
-            #print("coucoucouc",verticesToRemove)
-            #print("coouc",len(verticesToRemove))
-            #print('##############################################################')
-            #print('##############################################################')
-            #print('STEP ',l)
-#
-            #print("VERTICES TO REMOVE NUMBER = \n",len(verticesToRemove))
+            verticesToRemove = self.getVerticesToRemove(mesh=currentMesh,maxNeighborsNum = maxNeighborsNum)
 
             i = 0
-            Liste_Point_A_Supp = []
-            # testVertices:List[int] = testVerticesList[testVerticesIndex]
+
+            operations_l = []
 
             # Tant que le maillage courant contient des sommets "supprimables"
             while len(verticesToRemove) != 0:
                 
                 printer=True
 
-                if printer:print('1')
+                # if printer:print('1')
 
                 vertexToRemove = verticesToRemove[0]
-                print("VERTEX")
-                print(vertexToRemove)
-
+                # print("VERTEX")
+                # print(vertexToRemove)
+                # if vertexToRemove==454:
+                #     print('VERTEX 454 DETECTED at l=',l)
 
                 holedRegion:HoledRegion = HoledRegion(vertexToRemove=vertexToRemove,mesh=currentMesh)
 
-                if printer:print('1.5')
+                # if printer:print('1.5')
 
                 # Avant de supprimer quoi que ce soit dans les listes de faces, d'arrêtes et de sommets du maillage courant, on calcule les
                 # nouvelles arrêtes et faces qu'il faudra ajouter au maillage courant après la suppression du sommet sélectionné
                 newEdges,newFaces = holedRegion.getNewSimplices()
 
-                if printer:print('2')
+                # if printer:print('2')
 
                 # Supprimer v de la liste des sommets du maillage courant
                 # ## Supprimer v de la liste des points du maillage
-                vertexIndex = currentMesh.simplicies['vertices'].index(vertexToRemove)
-                currentMesh.points[vertexIndex] = np.array([-np.inf,-np.inf,-np.inf])
+                currentMesh.points[vertexToRemove] = np.array([-np.inf,-np.inf,-np.inf])
                 # ## Supprimer de la liste des sommets du maillage
-
-
                 currentMesh.simplicies['vertices'][vertexToRemove] = None
 
                 # Récupérer la liste des voisins de v
-
                 selectedVertexNeighbors = currentMesh.getNeighbors(vertexId=vertexToRemove).copy()
-
-                # Marquer les sommets voisins comme "non-supprimable" et les supprimer de la liste des sommets "supprimables"
-                # for vertexId in selectedVertexNeighbors:
-                #     try:
-                #         marked_vertices['removable'].remove(vertexId)
-                #     except ValueError:
-                #         pass
-                #     if vertexId not in marked_vertices['unremovable']:
-                #         marked_vertices['unremovable'].append(vertexId)
-
-                ##################
-                # print('vertexID',vertexID)
-################ probleme ici putain les selected vertex neighbors devrait apparaitre dans to be reomved au moins a la prmeiere iteration
-                # boucle un peu long mais il y'a t'il mieux ?
 
                 #la disparition est bien ici
                 selectedVertexNeighbors.append(vertexToRemove)
 
                 # Supprimer les arrêtes auxquelles appartient v
-                verticesToRemove = [v for v in verticesToRemove if v not in selectedVertexNeighbors]
-
-                edgesWithSelectedVertex = currentMesh.getEdgesWithVertex(vertexId=vertexToRemove)
-                print("edges removed", edgesWithSelectedVertex)
-                #print("current mesh", currentMesh.simplicies['edges'])
-                # soucis de nonapparition des sommets supprimés
-
-                for edge in edgesWithSelectedVertex:
-                    print(edge)
-                    currentMesh.simplicies['edges'].remove(edge)
-
-                # Supprimer les faces auxquelles appartient v
-                facesWithSelectedVertex = currentMesh.getFacesWithVertex(vertexId=vertexToRemove)
-                for face in facesWithSelectedVertex:
-                    if face in currentMesh.simplicies['faces']:
-                        currentMesh.simplicies['faces'].remove(face)
-
+                verticesToRemove = [v for v in verticesToRemove if v not in selectedVertexNeighbors]             
 
                 # Ajouter les nouvelles arrêtes et faces au maillage courrant
                 for edge in newEdges:
@@ -328,30 +292,120 @@ class MapsModel(obja.Model):
                     currentMesh.neighbors[edge[0]].append(edge[1])
                     currentMesh.neighbors[edge[1]].append(edge[0])
 
-
                 for face in newFaces:
                     currentMesh.simplicies['faces'].append(face)
+
+                edgesWithSelectedVertex = currentMesh.getEdgesWithVertex(vertexId=vertexToRemove)
+                # print("edges removed", edgesWithSelectedVertex)
+
+                for edge in edgesWithSelectedVertex:
+                    # print(edge)
+                    currentMesh.simplicies['edges'].remove(edge)
+
+                # Supprimer les faces auxquelles appartient v
+                facesWithSelectedVertex = currentMesh.getFacesWithVertex(vertexId=vertexToRemove)
+
+                # if vertexToRemove==107:
+                #     for face in facesWithSelectedVertex:
+                #         print("At l=0, face ",face," is in facesWithSelectedVertex")
+
+                # if vertexToRemove==107:
+
+                #     print("CURRENT MESH AT STAGE 0")
+                #     print(print('\n',"points = \n",currentMesh.points,'\n'))
+                #     print(print('\n',"vertices = \n",currentMesh.simplicies['vertices'],'\n'))
+                #     print(print('\n',"edges = \n",currentMesh.simplicies['edges'],'\n'))
+                #     print(print('\n',"faces = \n",currentMesh.simplicies['faces'],'\n'))
+                #     print(print('\n',"neighbors = \n",currentMesh.neighbors,'\n'))
+
+                #     for face in currentMesh.simplicies['faces']:
+                #         if face[0] == 107 or face[1]==107 or face[2]==107:
+                #             print("At l=0, face, ",face," is in current mesh")
+
+                # if vertexToRemove == 454:
+                #     print("faces with 454 before removal :",currentMesh.getFacesWithVertex(454))
+
+                for face in facesWithSelectedVertex:
+                    if face in currentMesh.simplicies['faces']: 
+
+                        # On ajoute la face supprimée à la liste des opérations du l-ième maillage
+                        operations_l.append(('face', currentMesh.simplicies['faces'].index(face), obja.Face(face[0],face[1],face[2])))
+                        
+                        currentMesh.simplicies['faces'].remove(face)
+                        # if vertexToRemove==454:
+                        #     print(currentMesh.simplicies['faces'].index(face))
+
+                # if vertexToRemove == 454:
+                #     print("faces with 454 after removal :",currentMesh.getFacesWithVertex(454))
 
                 currentMesh.neighbors[vertexToRemove] = []
                 for vertex in selectedVertexNeighbors:
                     if vertex != vertexToRemove:
                         currentMesh.neighbors[vertex].remove(vertexToRemove)
 
-                
-            #currentMesh.plot(title='level '+str(l))
+                ######### PHASE DE TEST #########
+                # facesWithSelectedVertex = currentMesh.getFacesWithVertex(vertexId=vertexToRemove)
 
-                # TEST : on regarde les points suppr.
-                #currentMesh.plot(f"loupe n° {l} nb sommets  {len(verticestoremove)} ")
-                
-                #i = i + 1
-            
+                # testList = []
+                # for face in currentMesh.simplicies['faces']:
+                #     if face[0] == vertexToRemove or face[1]==vertexToRemove or face[2]==vertexToRemove:
+                #         testList.append(face)
 
-            # on ajoute le maillage obtenu à la hierarchie des maillages
+                # if sorted(testList) != sorted(currentMesh.getFacesWithVertex(vertexToRemove)):
+
+                #     print(vertexToRemove," neighbors : ",currentMesh.neighbors[vertexToRemove])
+                #     for neighbor in currentMesh.neighbors[vertexToRemove]:
+                #         print("           ",neighbor," neighbors : ",currentMesh.neighbors[neighbor])
+
+                #     print("vertexToRemove = ",vertexToRemove,"   stage = ",l)
+                #     print(sorted(testList))
+                #     print(sorted(currentMesh.getFacesWithVertex(vertexToRemove)))
+                #     input()
+
+                ######### PHASE DE TEST #########   
+
+                # ATTENTION il faudra surement convertir currentMesh.points[vertexToRemove] en numpy,
+                # actuellement c'est juste une liste de float
+                operations_l.append(('vertex', vertexToRemove, currentMesh.points[vertexToRemove])) 
+
+                # if vertexToRemove==454:
+                #     print("At l == ",l," vertexToRemove == 454, faces with 474",currentMesh.getFacesWithVertex(474))
+                #     print("At l == ",l," vertexToRemove == 454, faces with 454",currentMesh.getFacesWithVertex(454))
+
+            # On ajoute le maillage obtenu à la hierarchie des maillages
             meshHierarchy.append(currentMesh.copy())
 
-            #testVerticesIndex = testVerticesIndex + 1
+            # La ligne suivante ne devrait pas être utile, mais elle l'est pourtant...
+            currentMesh.simplicies['faces'] = list(set(currentMesh.simplicies['faces']))
 
-        return meshHierarchy
+            # On ajoute la liste des opérations du l-ième malliage à la liste globale
+            operations.append(operations_l)
+
+        # On ajoute dans la liste des opérations globale, la liste des opérations nécessaires pour
+        # retrouver le maillage de base : "Base Domain" 
+        operationBaseDomain = []
+        
+        baseDomain = currentMesh
+
+        for face in baseDomain.simplicies['faces']:
+            # if face[0] == 103 or face[1]==103 or face[2]==103:
+            #     print("face, ",face[0]," ",face[1]," ",face[2]," is in base domain")
+            operationBaseDomain.append(('face', baseDomain.simplicies['faces'].index(face), obja.Face(face[0],face[1],face[2])))
+
+        for vertex in baseDomain.simplicies['vertices']:
+            if vertex is not None:
+                
+                operationBaseDomain.append(('vertex', vertex, baseDomain.points[vertex]))
+
+        operations.append(operationBaseDomain)
+
+        # for operation in operations:
+        #     print(operation)
+
+        for operation in operations:
+            operation.reverse()
+
+        return meshHierarchy,operations
     
 
     
