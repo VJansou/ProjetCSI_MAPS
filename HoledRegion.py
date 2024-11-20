@@ -23,12 +23,12 @@ class HoledRegion:
         self.starVertices = res[0].copy()
         self.isBoundary = res[1]
 
-        if vertexToRemove == 132:
-            print("star of 132 : ",self.starVertices)
+        # if vertexToRemove == 132:
+            # print("star of 132 : ",self.starVertices)
 
-            print(vertexToRemove," neighbors : ",mesh.neighbors[vertexToRemove])
-            for neighbor in mesh.neighbors[vertexToRemove]:
-                print("           ",neighbor," neighbors : ",mesh.neighbors[neighbor])
+            # print(vertexToRemove," neighbors : ",mesh.neighbors[vertexToRemove])
+            # for neighbor in mesh.neighbors[vertexToRemove]:
+            #     print("           ",neighbor," neighbors : ",mesh.neighbors[neighbor])
 
         # print('star edges = ',self.starEdges)
 

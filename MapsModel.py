@@ -10,19 +10,23 @@ from HoledRegion import HoledRegion
 
 #tests purpose
 import sys
-
+import keyboard
 
 class MapsModel(obja.Model):
     
-    def __init__(self,L):
+    def __init__(self,path):
         super().__init__()
-        self.L = L
-
-    def parse_file(self, path):
         super().parse_file(path)
         self.facesToList()
         self.createEdgesList()
         self.createNeighborsDict()
+        self.L = 5
+        self.status_vertices = {i: (-1 if i >= 507 else 1) for i in range(len(self.vertices))}
+    # def parse_file(self, path):
+    #     super().parse_file(path)
+    #     self.facesToList()
+    #     self.createEdgesList()
+    #     self.createNeighborsDict()
 
     """
         Retourne le maillage associé à un modèle déduit d'un fichier .obj
@@ -32,7 +36,7 @@ class MapsModel(obja.Model):
         Return: Mesh
     """
     def model2Mesh(self) -> Mesh:
-        finestMesh = Mesh(stepNum=self.L)
+        finestMesh = Mesh(5)
 
         # Parcours des sommets du modèle, on récupère l'indice d'un sommet dans self.vertices et son indice grâce à index
         for index,vertex in enumerate(self.vertices):
@@ -189,7 +193,9 @@ class MapsModel(obja.Model):
 
         return areas,maxArea,curvatures,maxCurvature
 
-    def getVerticesToRemove(self,mesh:Mesh,maxNeighborsNum:int=12,_lambda:float= 1/2) -> List[int]:
+    ang = 2*np.pi/3
+
+    def getVerticesToRemove(self,mesh:Mesh,maxNeighborsNum:int=12,_lambda:float= 1/2,threshold_curv=np.pi/3) -> List[int]:
 
         # print("Vertices to remove computation")
         
@@ -205,11 +211,17 @@ class MapsModel(obja.Model):
 
         supressionOrder = []
         
-        for indx,vertex in enumerate(selectedVertices):
-
-            weight = _lambda * areas[indx,0]/maxArea + (1-_lambda) * curvatures[indx,0]/maxCurvature
-            supressionOrder.append([vertex,weight])
-
+        for indx,verte in enumerate(selectedVertices):
+            if curvatures[indx,0] > threshold_curv:
+                weight = _lambda * areas[indx,0]/maxArea + (1-_lambda) * curvatures[indx,0]/maxCurvature
+                supressionOrder.append([verte,weight])
+            else: 
+                #faire corresposondre l'elemetn dans selected avec indice absolu
+                for ind_abs,absolute_vertex in enumerate(mesh.simplicies['vertices']):
+                    if absolute_vertex == verte:
+                        ## considerer l'ajout de la nouvelle condition dans l'ensemble général
+                        self.status_vertices[ind_abs] = 0
+                        mesh.simplicies['vertices'][ind_abs] = None
         supressionOrder.sort(key=lambda x: x[1],reverse=True)
 
         verticesToRemove = [e[0] for e in supressionOrder]
@@ -229,25 +241,34 @@ class MapsModel(obja.Model):
         numStep:int = initialMesh.stepNum
 
         # Liste des maillages obtenues après les simplifications successives
+        
         meshHierarchy:List[Mesh] = [initialMesh.copy()]
 
         currentMesh:Mesh = initialMesh
 
         operations = []
-
+        coucou = initialMesh.simplicies['vertices'].copy()
+        # self.status_vertices['508'] = 0
         # Pour chaque étape
-        for l in range(numStep-1,-1,-1):
-
+        compteur = 0
+        while 1 in self.status_vertices.values():
+            print("status",self.status_vertices.values())
+        
             # if l == 0:
             #     print("At l == 0, faces with 474",currentMesh.getFacesWithVertex(474))
 
-            currentMesh.currentStep = l
+            currentMesh.currentStep = 0
             verticesToRemove = self.getVerticesToRemove(mesh=currentMesh,maxNeighborsNum = maxNeighborsNum)
-
+            #la diff entre verticestoremove et le complete set de vertices
+            
+            ## c'etait avanty l'emploi du status_vertices
+            # filtered_vertices = [v for v in currentMesh.simplicies["vertices"] if v is not None]
+            # for verte in list(set(filtered_vertices)-set(verticesToRemove)):
+            #     currentMesh.simplicies['vertices'][verte] = None
             i = 0
 
             operations_l = []
-
+            print("pk")
             # Tant que le maillage courant contient des sommets "supprimables"
             while len(verticesToRemove) != 0:
                 
@@ -255,7 +276,10 @@ class MapsModel(obja.Model):
 
                 # if printer:print('1')
 
-                vertexToRemove = verticesToRemove[0]
+                vertexToRemove = verticesToRemove.pop(0)
+                self.status_vertices[vertexToRemove] = -1
+                
+            
                 # print("VERTEX")
                 # print(vertexToRemove)
                 # if vertexToRemove==454:
@@ -276,6 +300,7 @@ class MapsModel(obja.Model):
                 currentMesh.points[vertexToRemove] = np.array([-np.inf,-np.inf,-np.inf])
                 # ## Supprimer de la liste des sommets du maillage
                 currentMesh.simplicies['vertices'][vertexToRemove] = None
+                
 
                 # Récupérer la liste des voisins de v
                 selectedVertexNeighbors = currentMesh.getNeighbors(vertexId=vertexToRemove).copy()
@@ -283,7 +308,7 @@ class MapsModel(obja.Model):
                 #la disparition est bien ici
                 selectedVertexNeighbors.append(vertexToRemove)
 
-                # Supprimer les arrêtes auxquelles appartient v
+                # Supprimer les arrêtes auxquelles appartient v # donc tous les voisins dans l'itération courante
                 verticesToRemove = [v for v in verticesToRemove if v not in selectedVertexNeighbors]             
 
                 # Ajouter les nouvelles arrêtes et faces au maillage courrant
@@ -339,9 +364,11 @@ class MapsModel(obja.Model):
                 #     print("faces with 454 after removal :",currentMesh.getFacesWithVertex(454))
 
                 currentMesh.neighbors[vertexToRemove] = []
+
                 for vertex in selectedVertexNeighbors:
                     if vertex != vertexToRemove:
                         currentMesh.neighbors[vertex].remove(vertexToRemove)
+                        
 
                 ######### PHASE DE TEST #########
                 # facesWithSelectedVertex = currentMesh.getFacesWithVertex(vertexId=vertexToRemove)
@@ -375,12 +402,16 @@ class MapsModel(obja.Model):
             # On ajoute le maillage obtenu à la hierarchie des maillages
             meshHierarchy.append(currentMesh.copy())
 
+
+            compteur +=1
+            
+            print("compt", compteur)
             # La ligne suivante ne devrait pas être utile, mais elle l'est pourtant...
             currentMesh.simplicies['faces'] = list(set(currentMesh.simplicies['faces']))
 
             # On ajoute la liste des opérations du l-ième malliage à la liste globale
             operations.append(operations_l)
-
+            coucou = currentMesh.simplicies['vertices']
         # On ajoute dans la liste des opérations globale, la liste des opérations nécessaires pour
         # retrouver le maillage de base : "Base Domain" 
         operationBaseDomain = []

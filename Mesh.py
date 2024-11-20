@@ -148,7 +148,10 @@ class Mesh:
         
         edgesInOrder.append(currentVertex)
         while True:
-            neighborList = neighbors[currentVertex]
+            try:
+                neighborList = neighbors[currentVertex]
+            except KeyError:
+                break
             nextVertex = next((v for v in neighborList if v not in edgesInOrder), None)
             if nextVertex is None:  
                 break
