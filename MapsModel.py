@@ -18,7 +18,12 @@ class MapsModel(obja.Model):
         super().__init__()
         self.L = L
         self.liste_faces = self.facesToList()
+        self.list_faces = self.facesToList()
         self.edges = self.createEdgesList()
+        self.neighbours = self.createNeighborsDict()
+        self.status_vertices = {i: 1 for i in range(len(self.vertices))} # 1 = sommet removable, 0 = sommet unremovable
+        self.status_edges = {i: 1 for i in range(len(self.edges))} # 1 = normal edge, 0 = feature edge
+        self.taille_completeL = self.vertices
 
     def parse_file(self, path):
         super().parse_file(path)
@@ -258,14 +263,14 @@ class MapsModel(obja.Model):
 
         return diedre
     # selopn l'oangle considere comme unremovable
-    def feature_ou_pas(self,ind_edge,edge, threshold_angle = np.pi/4):
+    def feature_ou_pas(self,ind_edge,edge, threshold_angle = np.pi/6):
         diedre = self.calcul_diedre(edge)
         if diedre > threshold_angle:
             self.status_edges[ind_edge] = 0
             
 
 
-    def getVerticesToRemove(self,mesh:Mesh,maxNeighborsNum:int=12,_lambda:float= 1/2, threshold_curv = np.pi/4) -> List[int]:
+    def getVerticesToRemove(self,mesh:Mesh,maxNeighborsNum:int=12,_lambda:float= 1/2, threshold_curv = np.pi/6) -> List[int]:
 
         # print("Vertices to remove computation")
         
@@ -280,6 +285,9 @@ class MapsModel(obja.Model):
 
         for ind_edge,edge in enumerate(mesh.simplicies['edges']):
             self.feature_ou_pas(ind_edge,edge)
+            if ind_edge not in self.status_edges:
+                print(f"Key {ind_edge} not found in status_edges")
+                continue
             # 1 = removable, 0 = unremovable
             if self.status_edges[ind_edge] == 0:
                 if edge[0] in selectedVertices:
@@ -444,7 +452,9 @@ class MapsModel(obja.Model):
             meshHierarchy.append(currentMesh.copy())
 
             #testVerticesIndex = testVerticesIndex + 1
-
+        print("stratus_pck bizatrre", self.status_edges)
+        print("param du mesh", self.list_faces,self.edges)
+        print("neighbours", self.neighbors)
         return meshHierarchy
     
 

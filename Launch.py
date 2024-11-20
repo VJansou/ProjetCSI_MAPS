@@ -32,8 +32,9 @@ def main():
 
     #print(meshHierarchy)
     # for mesh in meshHierarchy:
-    #     mesh.plot(title='level '+str(mesh.currentStep))
-    
+    print("I am here !")
+    meshHierarchy[-1].plot(title='level ')
+    print("blocked here")
     back2model = meshHierarchy[-1].mesh2model()
     # model = decimate.Decimater()
     # model.parse_file('example/suzanne.obj')
