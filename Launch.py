@@ -53,17 +53,20 @@ def main():
         #     print("operation ",i," : ",operation)
 
         for (l,operations_l) in enumerate(operations):
-
-            # if l > 14:
-            #     break
+            print("l = ", l)
+            if l > -1:
+                break
 
             for (ty, index, value) in operations_l:
                 if ty == "vertex":
                     output_model.add_vertex(index, value)
                 elif ty == "face":
                     output_model.add_face(index, value)   
-                else:
-                    output_model.edit_vertex(index, value)
+                elif ty == "new_face" and l <= 1:
+                    print(operations_l)
+                    output_model.delete_face(index)
+                #else:
+                #    output_model.edit_vertex(index, value)
         
 
 if __name__ == '__main__':

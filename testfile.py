@@ -120,3 +120,6 @@ print("Internal angles of the polygon:", internal_angles)
 # Plot the polygon and its internal angles
 plot_polygon_with_angles(polygon, internal_angles)
 
+verticesInMesh = [1] * len([1,2,3,4,5])
+print(verticesInMesh)
+
