@@ -296,9 +296,9 @@ class MapsModel(obja.Model):
                     currentMesh.neighbors[edge[1]].append(edge[0])
 
                 for face in newFaces:
-                    currentMesh.simplicies['faces'].append(face)
                     if face not in currentMesh.simplicies['faces']: 
-                        operations_l.append(('new_face', currentMesh.simplicies['faces'].index(face), obja.Face(face[0],face[1],face[2])))
+                        operations_l.append(('new_face', 0, obja.Face(face[0],face[1],face[2])))
+                    currentMesh.simplicies['faces'].append(face)
 
                 edgesWithSelectedVertex = currentMesh.getEdgesWithVertex(vertexId=vertexToRemove)
                 # print("edges removed", edgesWithSelectedVertex)

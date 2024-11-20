@@ -52,18 +52,22 @@ def main():
         # for (i,operation) in enumerate(operations[0]):
         #     print("operation ",i," : ",operation)
 
+        faces = []
+        compression_level = 0
+
         for (l,operations_l) in enumerate(operations):
             print("l = ", l)
-            if l > -1:
+            if l > compression_level:
                 break
 
             for (ty, index, value) in operations_l:
                 if ty == "vertex":
                     output_model.add_vertex(index, value)
                 elif ty == "face":
-                    output_model.add_face(index, value)   
-                elif ty == "new_face" and l <= 1:
-                    print(operations_l)
+                    faces.append(value)
+                    output_model.add_face(len(faces)-1, value)   
+                elif ty == "new_face" and l+1 <= compression_level:
+                    index = faces.index(value)
                     output_model.delete_face(index)
                 #else:
                 #    output_model.edit_vertex(index, value)
