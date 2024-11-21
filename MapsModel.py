@@ -371,7 +371,7 @@ class MapsModel(obja.Model):
 
                 # ATTENTION il faudra surement convertir currentMesh.points[vertexToRemove] en numpy,
                 # actuellement c'est juste une liste de float
-                operations_l.append(('vertex', vertexToRemove, currentMesh.points[vertexToRemove])) 
+                #operations_l.append(('vertex', vertexToRemove, currentMesh.points[vertexToRemove])) 
 
                 # if vertexToRemove==454:
                 #     print("At l == ",l," vertexToRemove == 454, faces with 474",currentMesh.getFacesWithVertex(474))

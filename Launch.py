@@ -11,7 +11,8 @@ def main():
     Runs the program on the model given as parameter.
     """
     np.seterr(invalid = 'raise')
-    model = MapsModel.MapsModel(L=4)
+    L = 4
+    model = MapsModel.MapsModel(L)
     model.parse_file('./example/suzanne.obj')
 
     finestMesh = model.model2Mesh()
@@ -44,33 +45,36 @@ def main():
     with open('example/suzanne_compresse.obja', 'w+') as output2:
         back2model.contract(output2)
 
-    with open('example/suzanne_decompresse.obja', 'w+') as output:
-        # back2model.contract(output)
-        # Write the result in output file
-        output_model = obja.Output(output, random_color=True)
 
-        # for (i,operation) in enumerate(operations[0]):
-        #     print("operation ",i," : ",operation)
+    for compression_level in range(0,L+1):
+        filename = 'example/suzanne_decompresse_'+str(compression_level)+'.obja'
+        with open(filename, 'w+') as output:
+            # back2model.contract(output)
+            # Write the result in output file
+            output_model = obja.Output(output, random_color=True)
 
-        faces = []
-        compression_level = 0
+            # for (i,operation) in enumerate(operations[0]):
+            #     print("operation ",i," : ",operation)
 
-        for (l,operations_l) in enumerate(operations):
-            print("l = ", l)
-            if l > compression_level:
-                break
+            faces = []
 
-            for (ty, index, value) in operations_l:
-                if ty == "vertex":
-                    output_model.add_vertex(index, value)
-                elif ty == "face":
-                    faces.append(value)
-                    output_model.add_face(len(faces)-1, value)   
-                elif ty == "new_face" and l+1 <= compression_level:
-                    index = faces.index(value)
-                    output_model.delete_face(index)
-                #else:
-                #    output_model.edit_vertex(index, value)
+            for (l,operations_l) in enumerate(operations):
+                print("l = ", l)
+                if l > compression_level:
+                    break
+
+                for (ty, index, value) in operations_l:
+                    if ty == "vertex":
+                        output_model.add_vertex(index, value)
+                    elif ty == "face":
+                        faces.append(value)
+                        output_model.add_face(len(faces)-1, value)   
+                    elif ty == "new_face":
+                        index = faces.index(value) if value in faces else -1
+                        if index != -1:
+                            output_model.delete_face(index)
+                    #else:
+                    #    output_model.edit_vertex(index, value)
         
 
 if __name__ == '__main__':
