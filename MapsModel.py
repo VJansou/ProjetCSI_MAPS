@@ -195,14 +195,14 @@ class MapsModel(obja.Model):
 
     ang = 2*np.pi/3
 
-    def getVerticesToRemove(self,mesh:Mesh,maxNeighborsNum:int=12,_lambda:float= 1/2,threshold_curv=np.pi/3) -> List[int]:
+    def getVerticesToRemove(self, verticesInMesh,mesh:Mesh,maxNeighborsNum:int=12,_lambda:float= 1/2,threshold_curv=np.pi/3) -> List[int]:
 
         # print("Vertices to remove computation")
         
         selectedVertices = []
         unremovable = []
-        for vertex in mesh.simplicies['vertices']:
-            if vertex is not None:
+        for idx, vertex in enumerate(mesh.simplicies['vertices']):
+            if verticesInMesh[idx] == 1:
                 nbNeighbors:int = mesh.getNumberOfNeighbors(vertex)
                 if nbNeighbors <= maxNeighborsNum and nbNeighbors > 0:
                     selectedVertices.append(vertex)
@@ -248,6 +248,8 @@ class MapsModel(obja.Model):
 
         currentMesh:Mesh = initialMesh
 
+        verticesInMesh = [1] * len(currentMesh.simplicies['vertices'])
+
         operations = []
         ubnremovable_tot = []
         # self.status_vertices['508'] = 0
@@ -260,7 +262,7 @@ class MapsModel(obja.Model):
             #     print("At l == 0, faces with 474",currentMesh.getFacesWithVertex(474))
 
             currentMesh.currentStep = 0
-            verticesToRemove= self.getVerticesToRemove(mesh=currentMesh,maxNeighborsNum = maxNeighborsNum)
+            verticesToRemove = self.getVerticesToRemove(verticesInMesh, mesh=currentMesh,maxNeighborsNum = maxNeighborsNum)
 
             
             #la diff entre verticestoremove et le complete set de vertices
@@ -284,6 +286,8 @@ class MapsModel(obja.Model):
                 vertexToRemove = vertexToRemovesss[0]
                 if vertexToRemovesss[1] == 0 :
                     self.status_vertices[vertexToRemove] = -1
+
+                    verticesInMesh[vertexToRemove] = 0
                 
             
                 # print("VERTEX")
@@ -303,10 +307,12 @@ class MapsModel(obja.Model):
 
                 # Supprimer v de la liste des sommets du maillage courant
                 # ## Supprimer v de la liste des points du maillage
-                if vertexToRemovesss[1] == 0 :
-                    currentMesh.points[vertexToRemove] = np.array([-np.inf,-np.inf,-np.inf])
-                    # ## Supprimer de la liste des sommets du maillage
-                    currentMesh.simplicies['vertices'][vertexToRemove] = None
+
+                # /!\ pour que ça fonctionne, il ne faut pas modifier le vertex retiré ni ses coordonnées, on en a besoin dans la décompression
+                #if vertexToRemovesss[1] == 0 :
+                #    currentMesh.points[vertexToRemove] = np.array([-np.inf,-np.inf,-np.inf])
+                #    # ## Supprimer de la liste des sommets du maillage
+                #    currentMesh.simplicies['vertices'][vertexToRemove] = None
                 
 
                 # Récupérer la liste des voisins de v
@@ -326,6 +332,8 @@ class MapsModel(obja.Model):
                     currentMesh.neighbors[edge[1]].append(edge[0])
 
                 for face in newFaces:
+                    if face not in currentMesh.simplicies['faces']: 
+                        operations_l.append(('new_face', 0, obja.Face(face[0],face[1],face[2])))
                     currentMesh.simplicies['faces'].append(face)
 
                 edgesWithSelectedVertex = currentMesh.getEdgesWithVertex(vertexId=vertexToRemove)
@@ -403,21 +411,22 @@ class MapsModel(obja.Model):
 
                 # ATTENTION il faudra surement convertir currentMesh.points[vertexToRemove] en numpy,
                 # actuellement c'est juste une liste de float
-                operations_l.append(('vertex', vertexToRemove, currentMesh.points[vertexToRemove])) 
+                #operations_l.append(('vertex', vertexToRemove, currentMesh.points[vertexToRemove])) 
 
                 # if vertexToRemove==454:
                 #     print("At l == ",l," vertexToRemove == 454, faces with 474",currentMesh.getFacesWithVertex(474))
                 #     print("At l == ",l," vertexToRemove == 454, faces with 454",currentMesh.getFacesWithVertex(454))
 
+            # j'ai enlevé pour tester
             # gestion des unremvoables d'une couche pour creer les faces entre les staus 0 
-            for elem in unremovable:
-                facesWithSelectedVertex = currentMesh.getFacesWithVertex(vertexId=elem)
-            
-                for face in facesWithSelectedVertex:
-                        if face in currentMesh.simplicies['faces']: 
-
-                            # On ajoute la face supprimée à la liste des opérations du l-ième maillage
-                            operations_l.append(('face', currentMesh.simplicies['faces'].index(face), obja.Face(face[0],face[1],face[2])))
+            #for elem in unremovable:
+            #    facesWithSelectedVertex = currentMesh.getFacesWithVertex(vertexId=elem)
+            #
+            #    for face in facesWithSelectedVertex:
+            #            if face in currentMesh.simplicies['faces']: 
+            #
+            #                # On ajoute la face supprimée à la liste des opérations du l-ième maillage
+            #                operations_l.append(('face', currentMesh.simplicies['faces'].index(face), obja.Face(face[0],face[1],face[2])))
 
 
 
