@@ -200,7 +200,7 @@ class MapsModel(obja.Model):
         # print("Vertices to remove computation")
         
         selectedVertices = []
-        
+        unremovable = []
         for vertex in mesh.simplicies['vertices']:
             if vertex is not None:
                 nbNeighbors:int = mesh.getNumberOfNeighbors(vertex)
@@ -215,18 +215,20 @@ class MapsModel(obja.Model):
             if curvatures[indx,0] > threshold_curv:
                 weight = _lambda * areas[indx,0]/maxArea + (1-_lambda) * curvatures[indx,0]/maxCurvature
                 supressionOrder.append([verte,weight])
+                
             else: 
-                #faire corresposondre l'elemetn dans selected avec indice absolu
-                for ind_abs,absolute_vertex in enumerate(mesh.simplicies['vertices']):
-                    if absolute_vertex == verte:
-                        ## considerer l'ajout de la nouvelle condition dans l'ensemble général
-                        self.status_vertices[ind_abs] = 0
-                        mesh.simplicies['vertices'][ind_abs] = None
+            
+                ## considerer l'ajout de la nouvelle condition dans l'ensemble général on eneleve pas dans les faces 
+                        
+                self.status_vertices[verte] = 0
+                # mesh.simplicies['vertices'][ind_abs] = None
+                unremovable.append(verte)
+                # print("unremovable",absolute_vertex)
         supressionOrder.sort(key=lambda x: x[1],reverse=True)
 
         verticesToRemove = [e[0] for e in supressionOrder]
-
-        return verticesToRemove
+        ## il faut passer par les unremovables dans le while suivant du getmeshierarchy
+        return verticesToRemove, unremovable
     
     """
         Étant donné un maillage de départ, retourne la liste des maillages jusqu'au "Domain Base".
@@ -247,7 +249,7 @@ class MapsModel(obja.Model):
         currentMesh:Mesh = initialMesh
 
         operations = []
-        coucou = initialMesh.simplicies['vertices'].copy()
+        
         # self.status_vertices['508'] = 0
         # Pour chaque étape
         compteur = 0
@@ -258,7 +260,7 @@ class MapsModel(obja.Model):
             #     print("At l == 0, faces with 474",currentMesh.getFacesWithVertex(474))
 
             currentMesh.currentStep = 0
-            verticesToRemove = self.getVerticesToRemove(mesh=currentMesh,maxNeighborsNum = maxNeighborsNum)
+            verticesToRemove, unremovable = self.getVerticesToRemove(mesh=currentMesh,maxNeighborsNum = maxNeighborsNum)
             #la diff entre verticestoremove et le complete set de vertices
             
             ## c'etait avanty l'emploi du status_vertices
@@ -398,6 +400,18 @@ class MapsModel(obja.Model):
                 # if vertexToRemove==454:
                 #     print("At l == ",l," vertexToRemove == 454, faces with 474",currentMesh.getFacesWithVertex(474))
                 #     print("At l == ",l," vertexToRemove == 454, faces with 454",currentMesh.getFacesWithVertex(454))
+
+            # gestion des unremvoables d'une couche pour creer les faces entre les staus 0 
+            for elem in unremovable:
+                facesWithSelectedVertex = currentMesh.getFacesWithVertex(vertexId=vertexToRemove)
+            
+            for face in facesWithSelectedVertex:
+                    if face in currentMesh.simplicies['faces']: 
+
+                        # On ajoute la face supprimée à la liste des opérations du l-ième maillage
+                        operations_l.append(('face', currentMesh.simplicies['faces'].index(face), obja.Face(face[0],face[1],face[2])))
+
+
 
             # On ajoute le maillage obtenu à la hierarchie des maillages
             meshHierarchy.append(currentMesh.copy())

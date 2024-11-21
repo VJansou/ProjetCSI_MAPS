@@ -54,7 +54,6 @@ v -inf -inf -inf
 v -inf -inf -inf
 v -inf -inf -inf
 v -inf -inf -inf
-v -0.8125 -0.015625 -0.320313
 v -inf -inf -inf
 v -inf -inf -inf
 v -inf -inf -inf
@@ -98,9 +97,6 @@ v -inf -inf -inf
 v -inf -inf -inf
 v -inf -inf -inf
 v -inf -inf -inf
-v -1.03125 -0.039063 -0.304688
-f 101 57 13
-fc 1 0.9712523095016026 0.1359746814679209 0.837601045514774
 v -inf -inf -inf
 v -inf -inf -inf
 v -inf -inf -inf
@@ -114,6 +110,8 @@ v -inf -inf -inf
 v -inf -inf -inf
 v -inf -inf -inf
 v -inf -inf -inf
+v -inf -inf -inf
+v 1.234375 0.507813 -0.421875
 v -inf -inf -inf
 v -inf -inf -inf
 v -inf -inf -inf
@@ -413,9 +411,6 @@ v -inf -inf -inf
 v -inf -inf -inf
 v -inf -inf -inf
 v -inf -inf -inf
-v 0.859375 0.429688 0.59375
-f 414 57 13
-fc 2 0.6655680742348965 0.2865314453884036 0.39809382422255557
 v -inf -inf -inf
 v -inf -inf -inf
 v -inf -inf -inf
@@ -424,6 +419,7 @@ v -inf -inf -inf
 v -inf -inf -inf
 v -inf -inf -inf
 v -inf -inf -inf
+v -0.179688 -0.96875 0.554688
 v -inf -inf -inf
 v -inf -inf -inf
 v -inf -inf -inf
@@ -569,7 +565,7 @@ ev 53 -inf -inf -inf
 ev 54 -inf -inf -inf
 ev 55 -inf -inf -inf
 ev 56 -inf -inf -inf
-ev 57 -0.5625 0.234375 -0.07031300000000001
+ev 57 -inf -inf -inf
 ev 58 -inf -inf -inf
 ev 59 -inf -inf -inf
 ev 60 -inf -inf -inf
@@ -613,7 +609,7 @@ ev 97 -inf -inf -inf
 ev 98 -inf -inf -inf
 ev 99 -inf -inf -inf
 ev 100 -inf -inf -inf
-ev 101 -0.78125 0.21093699999999999 -0.054688000000000014
+ev 101 -inf -inf -inf
 ev 102 -inf -inf -inf
 ev 103 -inf -inf -inf
 ev 104 -inf -inf -inf
@@ -626,7 +622,7 @@ ev 110 -inf -inf -inf
 ev 111 -inf -inf -inf
 ev 112 -inf -inf -inf
 ev 113 -inf -inf -inf
-ev 114 -inf -inf -inf
+ev 114 1.484375 0.757813 -0.171875
 ev 115 -inf -inf -inf
 ev 116 -inf -inf -inf
 ev 117 -inf -inf -inf
@@ -926,7 +922,7 @@ ev 410 -inf -inf -inf
 ev 411 -inf -inf -inf
 ev 412 -inf -inf -inf
 ev 413 -inf -inf -inf
-ev 414 1.109375 0.6796880000000001 0.84375
+ev 414 -inf -inf -inf
 ev 415 -inf -inf -inf
 ev 416 -inf -inf -inf
 ev 417 -inf -inf -inf
@@ -934,7 +930,7 @@ ev 418 -inf -inf -inf
 ev 419 -inf -inf -inf
 ev 420 -inf -inf -inf
 ev 421 -inf -inf -inf
-ev 422 -inf -inf -inf
+ev 422 0.07031200000000001 -0.71875 0.804688
 ev 423 -inf -inf -inf
 ev 424 -inf -inf -inf
 ev 425 -inf -inf -inf
