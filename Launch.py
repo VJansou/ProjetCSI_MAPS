@@ -59,7 +59,7 @@ def main():
             faces = []
 
             for (l,operations_l) in enumerate(operations):
-                print("l = ", l)
+                #print("l = ", l)
                 if l > compression_level:
                     break
 
@@ -67,10 +67,11 @@ def main():
                     if ty == "vertex":
                         output_model.add_vertex(index, value)
                     elif ty == "face":
-                        faces.append(value)
-                        output_model.add_face(len(faces)-1, value)   
+                        if value not in faces:
+                            faces.append((value.a, value.b, value.c))
+                            output_model.add_face(len(faces)-1, value)   
                     elif ty == "new_face":
-                        index = faces.index(value) if value in faces else -1
+                        index = faces.index((value.a, value.b, value.c))
                         if index != -1:
                             output_model.delete_face(index)
                     #else:

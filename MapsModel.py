@@ -296,9 +296,9 @@ class MapsModel(obja.Model):
                     currentMesh.neighbors[edge[1]].append(edge[0])
 
                 for face in newFaces:
-                    if face not in currentMesh.simplicies['faces']: 
-                        operations_l.append(('new_face', 0, obja.Face(face[0],face[1],face[2])))
-                    currentMesh.simplicies['faces'].append(face)
+                    if face not in currentMesh.simplicies['faces']:
+                        operations_l.append(('new_face',0, obja.Face(face[0],face[1],face[2])))
+                        currentMesh.simplicies['faces'].append(face)
 
                 edgesWithSelectedVertex = currentMesh.getEdgesWithVertex(vertexId=vertexToRemove)
                 # print("edges removed", edgesWithSelectedVertex)
@@ -334,7 +334,7 @@ class MapsModel(obja.Model):
                     if face in currentMesh.simplicies['faces']: 
 
                         # On ajoute la face supprimée à la liste des opérations du l-ième maillage
-                        operations_l.append(('face', currentMesh.simplicies['faces'].index(face), obja.Face(face[0],face[1],face[2])))
+                        operations_l.append(('face',0, obja.Face(face[0],face[1],face[2])))
                         
                         currentMesh.simplicies['faces'].remove(face)
                         # if vertexToRemove==454:
@@ -395,7 +395,7 @@ class MapsModel(obja.Model):
         for face in baseDomain.simplicies['faces']:
             # if face[0] == 103 or face[1]==103 or face[2]==103:
             #     print("face, ",face[0]," ",face[1]," ",face[2]," is in base domain")
-            operationBaseDomain.append(('face', baseDomain.simplicies['faces'].index(face), obja.Face(face[0],face[1],face[2])))
+            operationBaseDomain.append(('face',0, obja.Face(face[0],face[1],face[2])))
 
         for vertex in baseDomain.simplicies['vertices']:
             if vertex is not None:

@@ -122,4 +122,8 @@ plot_polygon_with_angles(polygon, internal_angles)
 
 verticesInMesh = [1] * len([1,2,3,4,5])
 print(verticesInMesh)
+import obja
+value = obja.Face(1,2,3)
+if (value.a, value.b, value.c) == (1,2,3):
+    print("ok")
 
