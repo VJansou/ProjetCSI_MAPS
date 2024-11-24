@@ -1,46 +1,52 @@
 import numpy as np
-import MapsModel
-from typing import List
+from MapsModel import MapsModel
 import decimate
+import obja
 
 def main():
     """
     Runs the program on the model given as parameter.
     """
     np.seterr(invalid = 'raise')
-    model = MapsModel.MapsModel('./example/suzanne.obj')
-    #model.parse_file('./example/suzanne.obj')
+    maps_model = MapsModel('./example/suzanne.obj')
 
-    finestMesh = model.model2Mesh()
+    # On calcule l'objet compressé
+    operations = maps_model.compute_mesh_hierarchy()
 
-    # neighbors = finestMesh.getNeighborsInCyclicOrder(vertexId=3)
-    # print('neighbors = ',neighbors)
+    # On récupère le MapsModel compressé
+    mesh_hierarchy = maps_model.liste_simplicies
+    compressed_model = mesh_hierarchy[-1]
 
-    # print('POINTS')
-    # print(finestMesh.points)
-    # print('EDGES')
-    # print(finestMesh.simplicies['edges'])
-    # print('FACES')
-    # print(finestMesh.simplicies['faces'])
-    # print('VERTICES')
-    # print(finestMesh.simplicies['vertices'])
+    # On le transforme en model
+    model = maps_model.maps_to_model(compressed_model)
 
-    # model.getRetriangulation(mesh=finestMesh,vertexToRemove=0)
+    with open('example/suzanne_compresse.obja', 'w+') as output2:
+        model.contract(output2)
 
-    meshHierarchy:List[Mesh] = model.getMeshHierarchy(initialMesh=finestMesh,maxNeighborsNum= 54)
+    for compression_level in range(0, maps_model.L + 1):
+        filename = 'example/suzanne_decompresse_'+str(compression_level)+'.obja'
+        with open(filename, 'w+') as output:
+            # Write the result in output file
+            output_model = obja.Output(output, random_color=True)
 
+            faces = []
 
-    
-    
-    back2model = meshHierarchy[-1].mesh2Model()
+            for (l,operations_l) in enumerate(operations):
+                #print("l = ", l)
+                if l > compression_level:
+                    break
 
-    model = decimate.Decimater()
-    model.parse_file('example/suzanne.obj')
-
-    with open('example/suzanneeeeeeeeeeeerrrrrrrrrrrrez.obja', 'w+') as output:
-        model.contract(output)
-    # print(finestMesh.simplicies['faces'][:5])
-    # print(model.faces[:5])
+                for (ty, index, value) in operations_l:
+                    if ty == "vertex":
+                        output_model.add_vertex(index, value)
+                    elif ty == "face":
+                        if value not in faces:
+                            faces.append((value.a, value.b, value.c))
+                            output_model.add_face(len(faces)-1, value)   
+                    elif ty == "new_face":
+                        index = faces.index((value.a, value.b, value.c))
+                        if index != -1:
+                            output_model.delete_face(index)
 
 if __name__ == '__main__':
     main()

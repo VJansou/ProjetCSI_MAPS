@@ -1,243 +1,181 @@
 import obja
 import numpy as np
-from typing import List,Dict,Tuple
-from scipy.spatial import Delaunay,ConvexHull
-from math import pi,sqrt
-from numpy import inf
-import matplotlib.pyplot as plt
-from Mesh import Mesh
+from typing import List,Dict
 from HoledRegion import HoledRegion
+import decimate
 
-#tests purpose
-import sys
 # Sous-classe de obja.Model afin de mieux gérer les faces
 class MapsModel(obja.Model):
 
-    def __init__(self, path):
+    def __init__(self, path, treshold_dihedral_angle=3*np.pi/4):
         super().__init__()
         super().parse_file(path)
-        # self.facesToList()
-        # self.createEdgesList()
-        # self.createNeighborsDict()
-        self.liste_faces = self.facesToList()
-        self.edges = self.createEdgesList()
-        self.neighbours = self.createNeighborsDict()
-        self.status_vertices = {i: 1 for i in range(len(self.vertices))} # 1 = sommet removable, 0 = sommet unremovable
+        self.liste_faces = self.faces_to_list()
+        self.edges = self.create_edges_list()
+        self.neighbours = self.create_neighbours_dict()
+        self.status_vertices = {i: 1 for i in range(len(self.vertices))} # 1 = sommet removable, 0 = sommet unremovable, -1 sommet déjà enlevé
         self.status_edges = {i: 1 for i in range(len(self.edges))} # 1 = normal edge, 0 = feature edge
-        self.taille_completeL = self.vertices
-        self.L = 0
+        self.initialize_feature_edges(treshold_dihedral_angle)
+        self.intitialize_status_vertices()
+        self.L = 0 # nombre de niveaux
+        self.liste_simplicies:Dict[List[int]] = [self.initialize_liste_simplicies()] # Le K du papier
 
-
-
-
-    """
-        Retourne le maillage associé à un modèle déduit d'un fichier .obj
-
-        Args: None
-
-        Return: Mesh
-    """
-    def model2Mesh(self) -> Mesh:
-        finestMesh = Mesh(stepNum=self.L)
-
-        # Parcours des sommets du modèle, on récupère l'indice d'un sommet dans self.vertices et son indice grâce à index
-        for index,vertex in enumerate(self.vertices):
-            coordonates = vertex
-            finestMesh.points.append(coordonates)
-            finestMesh.simplicies['vertices'].append(index)
-
-        finestMesh.simplicies['faces'] = self.list_faces
-        finestMesh.simplicies['edges'] = self.edges
-        finestMesh.neighbors = self.neighbors
-
-        return finestMesh
-    
-    def facesToList(self):
-        listFaces = []
+    def faces_to_list(self):
+        """
+        Renvoie la liste des faces sous forme de liste de tuples de 3 sommets.
+        """
+        liste_faces = []
         for face in self.faces:
-            listFace = sorted([face.a, face.b, face.c])
-            listFaces.append(tuple(listFace))
-        self.list_faces = listFaces
-        return self.list_faces
-    
-    def createEdgesList(self):
-        self.edges = set()
-        for face in self.list_faces:
-            self.edges.add((face[0], face[1]))
-            self.edges.add((face[0], face[2]))
-            self.edges.add((face[1], face[2]))
-        self.edges = list(self.edges)
-        return self.edges
-    
-    def createNeighborsDict(self):
-        self.neighbors = {}
-        for index,_ in enumerate(self.vertices):
-            self.neighbors[index] = []
-        for edge in self.edges:
-            self.neighbors[edge[0]].append(edge[1])
-            self.neighbors[edge[1]].append(edge[0])
-        return self.neighbors
-    
-    def get1RingExternalEdges(self,centralVertex:int) -> List[List[int]]:
+            liste_faces.append(tuple(sorted([face.a, face.b, face.c])))
+        return liste_faces
 
-        facesWithCentralVertex = self.getFacesWithVertex(vertexId=centralVertex)
-        externalEdges = []
-
-        for face in facesWithCentralVertex:
-            externalEdges.append(tuple(vertex for vertex in face if vertex != centralVertex))
-        
-        return externalEdges
-    
-    def getExternalVerticesInCyclicOrder(self,vertexId:int) -> List[int]:
-
-        isBorderVertex = False
-        edgesInOrder = []
-        edges = self.get1RingExternalEdges(vertexId)
-        neighbors = {}
-        for edge in edges:
-            neighbors.setdefault(edge[0], []).append(edge[1])
-            neighbors.setdefault(edge[1], []).append(edge[0])
-
-        currentVertex = next((vertex for vertex, neighborList in neighbors.items() if len(neighborList) == 1), None)
-        if currentVertex is None:
-            if len(edges) > 0:
-                currentVertex = edges[0][0]
-        else:
-            isBorderVertex = True
-        
-        edgesInOrder.append(currentVertex)
-        while True:
-            neighborList = neighbors[currentVertex]
-            nextVertex = next((v for v in neighborList if v not in edgesInOrder), None)
-            if nextVertex is None:  
-                break
-            
-            edgesInOrder.append(nextVertex)
-            currentVertex = nextVertex
-
-        return edgesInOrder, isBorderVertex
-    
-
-    def getEdgesWithVertex(self,vertexId):
-        edges = []
-        for vertex in self.neighbors[vertexId]:
-            if vertex < vertexId:
-                edges.append((vertex, vertexId))
-            else:
-                edges.append((vertexId, vertex))
-
+    def create_edges_list(self):
+        """
+        Crée la liste des arêtes du modèle.
+        """
+        edges = set()
+        for face in self.liste_faces:
+            edges.add((face[0], face[1]))
+            edges.add((face[1], face[2]))
+            edges.add((face[0], face[2]))
+        edges = list(edges)
         return edges
     
-    def getFacesWithVertex(self, vertexId):
-        faces = set()
-        neighbors = self.neighbors[vertexId]
-        for neighbor in neighbors:
-            subNeighbors = self.neighbors[neighbor]
-            for subNeighbor in subNeighbors:
-                if subNeighbor in neighbors:
-                    face = sorted([vertexId, neighbor, subNeighbor])
-                    faces.add(tuple(face))
-        return list(faces)
-    
+    def create_neighbours_dict(self):
+        """
+        Crée un dictionnaire des voisins pour chaque sommet.
+        """
+        neighbours = {}
+        for index,_ in enumerate(self.vertices):
+            neighbours[index] = []
+        for edge in self.edges:
+            neighbours[edge[0]].append(edge[1])
+            neighbours[edge[1]].append(edge[0])
+        return neighbours
 
-    def computeArea(self,p0:np.ndarray,p1:np.ndarray,p2:np.ndarray) -> np.ndarray:
-        base = p1 - p0
-        milieu_segment = (p0 + p1)/2
+    def initialize_feature_edges(self, treshold_dihedral_angle):
+        """
+        Initialise le dictionnaire des feature edges.
+        """
+        for index, edge in enumerate(self.edges):
+            v0, v1 = edge
+            # On met les arêtes avec un angle diedre inférieur à treshold_angle comme feature edges
+            # Remarque : on calcule la distance de l'angle diedre à pi pour éviter les problèmes de périodicité
+            if np.abs(np.pi - self.compute_angle_diedre(v0, v1)) > treshold_dihedral_angle:
+                self.status_edges[index] = 0 # Marque l'arête comme feature edge
+        print("après initialize_feature_edges",self.status_edges.values())
+
+    def intitialize_status_vertices(self, treshold_curvature=np.pi):
+        """
+        Initialise le dictionnaire des sommets removable.
+        """
+        for index, _ in enumerate(self.vertices):
+            # # On met le premier et dernier sommet comme unremovable
+            # if index == 0 or index == len(self.vertices) - 1:
+            #     self.status_vertices[index] = 0
+            # On met les sommets avec une courbure supérieure à treshold_curvature comme unremovable
+            if self.compute_curvature_star(index) > treshold_curvature:
+                print("ici")
+                self.status_vertices[index] = 0
+            # On met les sommets qui sont associées à au moins 2 feature edges comme unremovable
+            elif len([edge for edge in self.edges if index in edge and self.status_edges[self.edges.index(edge)] == 0]) >= 2:
+                self.status_vertices[index] = 0
+                print("là")
+        print("après intitialize_status_vertices",self.status_vertices.values())
+
+    def initialize_liste_simplicies(self):
+        """
+        Initialise les simplicies.
+        """
+        simplicies = {'vertices':[],'edges':[],'faces':[]}
+        simplicies['vertices'] = [_ for _ in range(1,len(self.vertices))] # Contient les indices des sommets
+        simplicies['edges'] = self.edges
+        simplicies['faces'] = self.liste_faces
+        return simplicies
         
-        hauteur = p2 - milieu_segment
-        #print(base)
-        #print(hauteur)
-        return np.linalg.norm(np.cross(base,hauteur)) / 2
-    
-    def computeCurvature(self,p0:np.ndarray,p1:np.ndarray,p2:np.ndarray) -> float:
-        # Pour le calcul d'un angle d'une face, on utilise la loi d'Al-Kashi
-        p0p1 = np.sqrt(np.sum((p0-p1)**2))
-        p1p2 = np.sqrt(np.sum((p1-p2)**2))
-        p0p2 = np.sqrt(np.sum((p0-p2)**2))
-        return np.arccos((p0p1**2 + p0p2**2 - p1p2**2)/(2*p0p1*p0p2))
 
-    def getAreasAndCurvatures(self,mesh:Mesh,selectedVertices:List[int]) -> Tuple[np.ndarray,float,np.ndarray,float]:
+    def get_faces_from_edge(self, edge):
+        """
+        Renvoie les faces qui contiennent une arête.
+        """
+        faces = []
+        compteur = 0 # Il ne peut y avoir que 2 faces qui contiennent une arête
+        for face in self.liste_faces:
+            if edge[0] in face and edge[1] in face and compteur < 2:
+                faces.append(face)
+                compteur += 1
+        return faces
 
-        nbVertices = len(selectedVertices)
-
-        areas = np.zeros((nbVertices,1))
-        curvatures = np.zeros((nbVertices,1))
-
-        maxArea = -inf
-        maxCurvature = -inf
-
-        for indx,vertex in enumerate(selectedVertices):
-            facesWithVertex = mesh.getFacesWithVertex(vertexId=vertex)
-
-            starArea = 0
-            starCurvature = 0
-
-            for face in facesWithVertex:
-                starArea = starArea + self.computeArea(p0=mesh.points[face[0]],p1=mesh.points[face[1]],p2=mesh.points[face[2]])
-                face_copy = list(face)
-                face_copy.remove(vertex)
-                starCurvature = starCurvature + self.computeCurvature(p0=mesh.points[vertex],p1=mesh.points[face_copy[0]],p2=mesh.points[face_copy[1]])
-
-            areas[indx,0] = starArea
-            curvatures[indx,0] = starCurvature
-
-            if starArea > maxArea:
-                maxArea = starArea
-
-            if starCurvature > maxCurvature:
-                maxCurvature = starCurvature
-
-        return areas,maxArea,curvatures,maxCurvature
-
-    # def faces_to_list(self):
-    #     """
-    #     Renvoie la liste des faces sous forme de liste de tuples de 3 sommets.
-    #     """
-    #     liste_faces = []
-    #     for face in self.faces:
-    #         liste_faces.append(tuple(sorted([face.a, face.b, face.c])))
-    #     return liste_faces
-
-    # def create_edges_list(self):
-    #     """
-    #     Crée la liste des arêtes du modèle.
-    #     """
-    #     edges = set()
-    #     for face in self.liste_faces:
-    #         self.edges.add((face[0], face[1]))
-    #         self.edges.add((face[1], face[2]))
-    #         self.edges.add((face[0], face[2]))
-    #     return edges
-    
-    # def create_neighbours_dict(self):
-    #     """
-    #     Crée un dictionnaire des voisins pour chaque sommet.
-    #     """
-    #     neighbours = {}
-    #     for index,_ in enumerate(self.vertices):
-    #         neighbours[index] = []
-    #     for edge in self.edges:
-    #         neighbours[edge[0]].append(edge[1])
-    #         neighbours[edge[1]].append(edge[0])
-    #     return neighbours
-
-
-    
     def get_neighbours(self, vertex):
         """
         Renvoie les voisins d'un sommet.
         """
         return self.neighbours[vertex]
     
-    def get_star(self, vertex):
+    def get_star_faces(self, central_vertex):
         """
-        Renvoie l'étoile d'un sommet.
+        Renvoie la liste des faces de l'étoile d'un sommet.
         """
         star = []
         for face in self.liste_faces:
-            if vertex in face:
+            if central_vertex in face:
                 star.append(face)
         return star
+
+    def get_star_external_edges(self, central_vertex):
+        """
+        Renvoie la liste des arêtes extérieures de l'étoile d'un sommet.
+        """
+        external_edges = []
+        star = self.get_star_faces(central_vertex)
+        for face in star:
+            external_edges.append(tuple(vertex for vertex in face if vertex != central_vertex))
+        return external_edges
+    
+    def get_star_vertices_in_cyclic_order(self, central_vertex):
+        """
+        Renvoie les sommets de l'étoile d'un sommet dans l'ordre cyclique.
+        Renvoie aussi si le sommet est sur le bord.
+        """
+        vertices_in_cyclic_order = []
+        is_boundary = False
+        # On récupère les arêtes extérieures de l'étoile
+        star_external_edges = self.get_star_external_edges(central_vertex)
+
+        # On crée un dictionnaire des voisins pour chaque sommet
+        neighbours = {}
+        for edge in star_external_edges:
+            neighbours.setdefault(edge[0], []).append(edge[1])
+            neighbours.setdefault(edge[1], []).append(edge[0])
+
+        # On récupère un bord de l'étoile s'il existe : 
+        # cela permet de partir d'un sommet sur le bord s'il y en a un et donc de s'assurer de parcourir toute l'étoile
+        current_vertex = next((vertex for vertex, neighbour_list in neighbours.items() if len(neighbour_list) == 1), None)
+        
+        if current_vertex is None: # S'il n'y a pas de bord
+            # On prend un sommet quelconque de l'étoile
+            current_vertex = star_external_edges[0][0]
+        else: # S'il y a un bord
+            is_boundary = True
+        # On ajout le sommet à la liste
+        vertices_in_cyclic_order.append(current_vertex)
+
+        # On parcourt l'étoile
+        while True:
+            # On récupère les voisins du sommet actuel
+            current_neighbours = neighbours[current_vertex]
+            # On récupère le voisin suivant
+            next_vertex = next((vertex for vertex in current_neighbours if vertex not in vertices_in_cyclic_order),None)
+            # On sort de la boucle si on a fait le tour de l'étoile
+            if next_vertex is None:
+                break
+            # On ajoute le voisin suivant à la liste
+            vertices_in_cyclic_order.append(next_vertex)
+            # On change de sommet
+            current_vertex = next_vertex
+
+        return vertices_in_cyclic_order, is_boundary
+            
 
     def compute_area_face(self, face):
         """
@@ -252,245 +190,191 @@ class MapsModel(obja.Model):
         """
         Calcule l'aire associée à l'étoile d'un sommet.
         """
-        star = self.get_star(vertex)
+        star = self.get_star_faces(vertex)
         area = 0
         for face in star:
             area += self.compute_area_face(face)
         return area
 
-    def compute_curvature_face(self, face):
+    def compute_angle_face(self, face, central_vertex):
         """
-        Calcule la courbure d'une face.
+        Calcule l'angle d'une face.
         """
-        a = self.vertices[face[0]]
-        b = self.vertices[face[1]]
-        c = self.vertices[face[2]]
+        # On trouve l'indice du central_vertex dans la face
+        index_central = face.index(central_vertex)
+
+        # On associe les points du triangle
+        a = self.vertices[face[index_central]]  # Sommet central
+        b = self.vertices[face[(index_central + 1) % 3]]  # Point suivant
+        c = self.vertices[face[(index_central + 2) % 3]]  # Point précédent
         ab = np.linalg.norm(b - a)
         bc = np.linalg.norm(c - b)
         ac = np.linalg.norm(a - c)
         return np.arccos((ab**2 + ac**2 - bc**2) / (2 * ab * ac))
     
-    def compute_curvature_star(self, vertex):
+    def compute_curvature_star(self, central_vertex):
         """
         Calcule la courbure associée à l'étoile d'un sommet.
         """
-        star = self.get_star(vertex)
+        star = self.get_star_faces(central_vertex)
         curvature = 0
         for face in star:
-            curvature += self.compute_curvature_face(face)
+            curvature += self.compute_angle_face(face, central_vertex)
         return 2*np.pi - curvature
     
-    def calculate_normal(self,v1, v2, v3):
+    def compute_angle_diedre(self, v0, v1):
         """
-        Calcule la normale d'une face triangulaire définie par 3 sommets.
+        Calcule l'angle diedre entre deux arêtes.
         """
+        faces = self.get_faces_from_edge((v0, v1))
+        if len(faces) != 2:
+            return 0
+        normal_0 = np.cross(self.vertices[faces[0][1]] - self.vertices[faces[0][0]], self.vertices[faces[0][2]] - self.vertices[faces[0][0]])
+        normal_1 = np.cross(self.vertices[faces[1][1]] - self.vertices[faces[1][0]], self.vertices[faces[1][2]] - self.vertices[faces[1][0]])
+        return np.arccos(np.clip(np.dot(normal_0, normal_1) / (np.linalg.norm(normal_0) * np.linalg.norm(normal_1)), -1, 1))
+        
 
-        u = np.array(v2) - np.array(v1)
-        v = np.array(v3) - np.array(v1)
-        
-        # Produit vectoriel pour obtenir la normale
-        normal = np.cross(u, v)
-        
-        # Normalisation
-        norm = np.linalg.norm(normal)
-        if norm == 0:
-            return np.array([0, 0, 0])  # Cas dégénéré (points colinéaires)
-        
-        return normal / norm
-
-    def dihedral_angle(self,normal1, normal2, shared_edge_vector):
+    def get_vertices_to_remove(self, max_neighbours, lambda_):
         """
-        Calcule l'angle dièdre entre deux normales et le vecteur de l'arête partagée.
+        Renvoie les sommets à enlever (leurs indices) pour un niveau dans l'ordre de priorité.
         """
+        # On récupère les sommets removable
+        vertices_to_remove = []
+        for status_vertex in enumerate(self.status_vertices):
+            if status_vertex == 1 and len(self.get_neighbours(status_vertex)) <= max_neighbours:
+                vertices_to_remove.append(status_vertex)
 
-        shared_edge_vector = shared_edge_vector / np.linalg.norm(shared_edge_vector)
-        
+        # S'il n'y a pas de sommets removable, on renvoie une liste vide
+        if not vertices_to_remove:
+            return vertices_to_remove
 
-        cos_theta = np.dot(normal1, normal2)
-        cos_theta = np.clip(cos_theta, -1.0, 1.0)  # Éviter les erreurs numériques hors [-1, 1]
-        
+        # On calcul les aires et les courbures associées à chaque sommet
+        areas = [self.compute_area_star(vertex) for vertex in vertices_to_remove]
+        curvatures = [self.compute_curvature_star(vertex) for vertex in vertices_to_remove]
 
-        angle = np.arccos(cos_theta)
-        
-        # On calcule un vecteur "binormal" pour déterminer si l'angle est obtus ou aigu
-        cross_product = np.cross(normal1, normal2)
-        orientation = np.dot(cross_product, shared_edge_vector)
-        
-        if orientation < 0:
+        # On calcule les poids associés à chaque sommet
+        max_area = max(areas)
+        max_curvature = max(curvatures)
+        weights = [lambda_ * area / max_area + (1 - lambda_) * curvature / max_curvature for area, curvature in zip(areas, curvatures)]
+
+        # On trie les sommets à enlever par ordre de priorité
+        vertices_to_remove = [vertex for _, vertex in sorted(zip(weights, vertices_to_remove), reverse=True)]
+
+        return vertices_to_remove
+
+    def compute_mesh_hierarchy(self, max_neighbours=12, lambda_=0.5):
+        """
+        Calcule les différents mesh.
+        Renvoie la liste des opérations.
+        """
+        # On intialise la liste des opérations
+        operations = []
+        # On boucle tant qu'il reste des sommets removable
+        while 1 in self.status_vertices.values():
             
-            angle = -angle
-        
-        return angle
-
-    def get_face_from_edge(self,edge):
-        faces = []
-        compteur = 0
-        for face in self.liste_faces:
-            if edge[0] in face and edge[1] in face and compteur < 2:
-                faces.append(face)
-                compteur += 1
-
-        return faces
-    # obtenir l'angle des normales des faces d'une edge
-    def calcul_diedre(self,edge):
-
-        
-        faces = self.get_face_from_edge(edge)
-        diedre = -inf
-        if len(faces) == 2:
-            normal1 = self.calculate_normal(self.vertices[faces[0][0]], self.vertices[faces[0][1]], self.vertices[faces[0][2]])
-            normal2 = self.calculate_normal(self.vertices[faces[1][0]], self.vertices[faces[1][1]], self.vertices[faces[1][2]])
-            shared_edge_vector = self.vertices[edge[1]] - self.vertices[edge[0]]
-            diedre = self.dihedral_angle(normal1, normal2, shared_edge_vector)
-
-        return diedre
-    # selopn l'oangle considere comme unremovable
-    def feature_ou_pas(self,ind_edge,edge, threshold_angle = np.pi/4):
-        diedre = self.calcul_diedre(edge)
-        if diedre > threshold_angle:
-            self.status_edges[ind_edge] = 0
-            
-
-
-    def getVerticesToRemove(self,mesh:Mesh,maxNeighborsNum:int=12,_lambda:float= 1/2, threshold_curv = np.pi/4) -> List[int]:
-
-        # print("Vertices to remove computation")
-        
-        selectedVertices = []
-        
-        for vertex in mesh.simplicies['vertices']:
-            if vertex is not None:
-                nbNeighbors:int = mesh.getNumberOfNeighbors(vertex)
-                if nbNeighbors <= maxNeighborsNum and nbNeighbors > 0:
-                    selectedVertices.append(vertex)
-        ##gerer les feature edges
-
-        for ind_edge,edge in enumerate(mesh.simplicies['edges']):
-            self.feature_ou_pas(ind_edge,edge)
-            # 1 = removable, 0 = unremovable
-            if self.status_edges[ind_edge] == 0:
-                if edge[0] in selectedVertices:
-                    selectedVertices.remove(edge[0])
-                if edge[1] in selectedVertices:
-                    selectedVertices.remove(edge[1])
-
-
-        #print(selectedVertices)
-
-        areas,maxArea,curvatures,maxCurvature = self.getAreasAndCurvatures(mesh=mesh,selectedVertices=selectedVertices)
-
-        supressionOrder = []
-        
-        for indx,vertex in enumerate(selectedVertices):
-            if curvatures[indx,0] > threshold_curv:
-                weight = _lambda * areas[indx,0]/maxArea + (1-_lambda) * curvatures[indx,0]/maxCurvature
-                supressionOrder.append([vertex,weight])
-
-        supressionOrder.sort(key=lambda x: x[1],reverse=True)
-
-        verticesToRemove = [e[0] for e in supressionOrder]
-
-        return verticesToRemove
-    
-
-    def getMeshHierarchy(self,initialMesh:Mesh,maxNeighborsNum = 12) -> List[Mesh]:
-        
-        numStep:int = initialMesh.stepNum
-
-        # Liste des maillages obtenues après les simplifications successives
-        meshHierarchy:List[Mesh] = [initialMesh.copy()]
-        currentMesh:Mesh = initialMesh
-
-        ## passer au moins une fois de le while
-        verticesToRemove = currentMesh.simplicies["vertices"]
-        while verticesToRemove != None:
+            # On augmente le niveau
             self.L += 1
-            verticesToRemove = self.getVerticesToRemove(mesh=currentMesh,maxNeighborsNum = maxNeighborsNum )
+            print("L = ", self.L)
+
+            # On initialise les simplicies pour ce niveau comme les simplicies du niveau précédent
+            simplicies = self.liste_simplicies[-1]
+
+            # On initialise la liste des opérations pour ce niveau
+            operations_l = []
+
+            # On récupère les indices des sommets à enlever
+            vertices_to_remove = self.get_vertices_to_remove(max_neighbours, lambda_)
+
+            # On sort de la boucle si on ne peut plus enlever de sommets
+            if not vertices_to_remove:
+                break
+
+            # On boucle tant que vertices_to_remove n'est pas vide
+            while vertices_to_remove:
+                # On récupère le sommet à enlever
+                vertex_to_remove = vertices_to_remove.pop(0)
+
+                # On change le statut du sommet à -1
+                self.status_vertices[vertex_to_remove] = -1
+
+                # Avant de supprimer les faces, arrêtes et le sommet du simplicies courant,
+                # on calcule les nouvelles arrêtes et faces à ajouter
+                holed_region = HoledRegion(vertex_to_remove, self)
+                new_edges, new_faces = holed_region.compute_new_edges_and_faces()
+
+                # On enlève le sommet des simplicies
+                simplicies['vertices'].remove(vertex_to_remove)
+                # On enlève les arêtes associées à ce sommet dans les simplicies
+                simplicies['edges'] = [edge for edge in simplicies['edges'] if vertex_to_remove not in edge]
+                # On enlève les faces associées à ce sommet dans les simplicies
+                simplicies['faces'] = [face for face in simplicies['faces'] if vertex_to_remove not in face]
+                
+                # On ajoute les nouvelles arêtes et les nouvelles faces aux simplicies
+                simplicies['edges'] += new_edges
+                simplicies['faces'] += new_faces
+
+                # On ajoute les opérations pour les nouvelles faces
+                for face in new_faces:
+                    operations_l.append(('new_face', 0, obja.Face(face[0],face[1],face[2])))
+
+                # On ajoute les opérations pour les faces à supprimer
+                for face in self.get_star_faces(vertex_to_remove):
+                    operations_l.append(('face', 0, obja.Face(face[0],face[1],face[2])))
+
+                # On met à jour le dictionnaire des voisins
+                for edge in new_edges:
+                    for vertex in edge:
+                        self.neighbours[vertex].append(edge[0] if edge[1] == vertex else edge[1])
+
+                # On enlève les voisins de ce sommet de vertices_to_remove
+                neighbours_vertex_to_remove = self.get_neighbours(vertex_to_remove)
+                for neighbour in neighbours_vertex_to_remove:
+                    if neighbour in vertices_to_remove:
+                        vertices_to_remove.remove(neighbour)
             
-#
-            #print("VERTICES TO REMOVE NUMBER = \n",len(verticesToRemove))
+            # On ajoute les simplicies pour ce niveau à la liste des simplicies
+            self.liste_simplicies.append(simplicies)
 
-            i = 0
-            Liste_Point_A_Supp = []
-            # testVertices:List[int] = testVerticesList[testVerticesIndex]
+            # On ajoute les opérations pour ce niveau à la liste des opérations
+            operations.append(operations_l)
+        
+            # On met à jour les feature edges et les sommets unremovable
+        print("toto",self.status_vertices.values())
+        
+        # On est au coarsest mesh : on ajoute les operations pour ce niveau à la liste des opérations
+        operations_cm = []
+        for face in self.liste_simplicies[-1]['faces']:
+            operations_cm.append(('face', 0, obja.Face(face[0],face[1],face[2])))
 
-            # Tant que le maillage courant contient des sommets "supprimables"
-            while len(verticesToRemove) != 0:
-                
-                printer=True
+        for vertex in self.liste_simplicies[-1]['vertices']:
+            vertex -= 1
+            # print("vertex = ", vertex)
+            # print("self.vertices[vertex] = ", self.vertices[vertex])
+            operations_cm.append(('vertex', vertex, self.vertices[vertex]))
 
-                if printer:print('1')
+        operations.append(operations_cm)
 
-                vertexToRemove = verticesToRemove[0]
-                print("VERTEX")
-                print(vertexToRemove)
-
-
-                holedRegion:HoledRegion = HoledRegion(vertexToRemove=vertexToRemove,mesh=currentMesh)
-
-                if printer:print('1.5')
-
-                # Avant de supprimer quoi que ce soit dans les listes de faces, d'arrêtes et de sommets du maillage courant, on calcule les
-                # nouvelles arrêtes et faces qu'il faudra ajouter au maillage courant après la suppression du sommet sélectionné
-                newEdges,newFaces = holedRegion.getNewSimplices()
-
-                if printer:print('2')
-
-                # Supprimer v de la liste des sommets du maillage courant
-                # ## Supprimer v de la liste des points du maillage
-                vertexIndex = currentMesh.simplicies['vertices'].index(vertexToRemove)
-                currentMesh.points[vertexIndex] = np.array([-np.inf,-np.inf,-np.inf])
-                # ## Supprimer de la liste des sommets du maillage
+        # On met le sens des opérations à l'envers
+        for operation in operations:
+            operation.reverse()
+        
+        return operations
 
 
-                currentMesh.simplicies['vertices'][vertexToRemove] = None
+    def maps_to_model(self, simplicies):
+        """
+        Transforme les simplicies en modèle.
+        """
+        model = decimate.Decimater()
+        # print("simplicies[vertices] = ", simplicies['vertices'])
+        # print(len(self.vertices))
+        # print(len(simplicies['vertices']))
+        model.vertices = [self.vertices[idx] for idx in simplicies['vertices']]
+        model.faces = []
+        i = 0
+        for face in simplicies['faces']:
+            model.faces.append(obja.Face(a=face[0], b=face[1], c=face[2]))
 
-                # Récupérer la liste des voisins de v
-
-                selectedVertexNeighbors = currentMesh.getNeighbors(vertexId=vertexToRemove).copy()
-
-
-                #la disparition est bien ici
-                selectedVertexNeighbors.append(vertexToRemove)
-
-                # Supprimer les arrêtes auxquelles appartient v
-                verticesToRemove = [v for v in verticesToRemove if v not in selectedVertexNeighbors]
-
-                edgesWithSelectedVertex = currentMesh.getEdgesWithVertex(vertexId=vertexToRemove)
-                print("edges removed", edgesWithSelectedVertex)
-                #print("current mesh", currentMesh.simplicies['edges'])
-                # soucis de nonapparition des sommets supprimés
-
-                for edge in edgesWithSelectedVertex:
-                    print(edge)
-                    currentMesh.simplicies['edges'].remove(edge)
-
-                # Supprimer les faces auxquelles appartient v
-                facesWithSelectedVertex = currentMesh.getFacesWithVertex(vertexId=vertexToRemove)
-                for face in facesWithSelectedVertex:
-                    if face in currentMesh.simplicies['faces']:
-                        currentMesh.simplicies['faces'].remove(face)
-
-
-                # Ajouter les nouvelles arrêtes et faces au maillage courrant
-                for edge in newEdges:
-                    currentMesh.simplicies['edges'].append(edge)
-                    currentMesh.neighbors[edge[0]].append(edge[1])
-                    currentMesh.neighbors[edge[1]].append(edge[0])
-
-
-                for face in newFaces:
-                    currentMesh.simplicies['faces'].append(face)
-
-                currentMesh.neighbors[vertexToRemove] = []
-                for vertex in selectedVertexNeighbors:
-                    if vertex != vertexToRemove:
-                        currentMesh.neighbors[vertex].remove(vertexToRemove)
-
-                
-
-            meshHierarchy.append(currentMesh.copy())
-
-
-        print(self.L)
-        return meshHierarchy
+        model.line = len(model.vertices) + len(model.faces)
+        return model
+            
