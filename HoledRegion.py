@@ -163,7 +163,9 @@ class HoledRegion:
         magnitude_b = np.linalg.norm(vector_b)
 
         # Calculate the angle in radians
-        angle_radians = np.arccos(dot_product / (magnitude_a * magnitude_b))
+        # print('valeure bizarre ', dot_product / (magnitude_a * magnitude_b))
+        # > 1 
+        angle_radians = np.arccos(np.min([dot_product / (magnitude_a * magnitude_b),1]))
 
         # Convert angle to degrees
         angle_degrees = np.degrees(angle_radians)
