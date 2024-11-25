@@ -14,11 +14,11 @@ import sys
 
 class MapsModel(obja.Model):
     
-    def __init__(self,L):
+    def __init__(self,path):
         super().__init__()
-        self.L = L
+        self.L = 4
 
-    def parse_file(self, path):
+    #def parse_file(self, path):
         super().parse_file(path)
         self.facesToList()
         self.createEdgesList()
@@ -189,14 +189,14 @@ class MapsModel(obja.Model):
 
         return areas,maxArea,curvatures,maxCurvature
 
-    def getVerticesToRemove(self, verticesInMesh, mesh:Mesh,maxNeighborsNum:int=12,_lambda:float= 1/2) -> List[int]:
+    def getVerticesToRemove(self, status_vertices, mesh:Mesh,maxNeighborsNum:int=12,_lambda:float= 1/2,threshold_curv=np.pi) -> List[int]:
 
         # print("Vertices to remove computation")
         
         selectedVertices = []
         
         for idx, vertex in enumerate(mesh.simplicies['vertices']):
-            if verticesInMesh[idx] == 1:
+            if status_vertices[idx] == 1:
                 nbNeighbors:int = mesh.getNumberOfNeighbors(vertex)
                 if nbNeighbors <= maxNeighborsNum and nbNeighbors > 0:
                     selectedVertices.append(vertex)
@@ -204,11 +204,18 @@ class MapsModel(obja.Model):
         areas,maxArea,curvatures,maxCurvature = self.getAreasAndCurvatures(mesh=mesh,selectedVertices=selectedVertices)
 
         supressionOrder = []
+        print(curvatures)
+        print(threshold_curv)
         
         for indx,vertex in enumerate(selectedVertices):
+            if curvatures[indx,0] > threshold_curv:
+                weight = _lambda * areas[indx,0]/maxArea + (1-_lambda) * curvatures[indx,0]/maxCurvature
+                supressionOrder.append([vertex,weight])
+            else:
+                for ind_abs, vertex_abs in enumerate(mesh.simplicies['vertices']):
+                    if vertex_abs == vertex:
+                        status_vertices[ind_abs] = 0
 
-            weight = _lambda * areas[indx,0]/maxArea + (1-_lambda) * curvatures[indx,0]/maxCurvature
-            supressionOrder.append([vertex,weight])
 
         supressionOrder.sort(key=lambda x: x[1],reverse=True)
 
@@ -233,18 +240,22 @@ class MapsModel(obja.Model):
 
         currentMesh:Mesh = initialMesh
 
-        verticesInMesh = [1] * len(currentMesh.simplicies['vertices'])
+        status_vertices = ([1] * (len(currentMesh.simplicies['vertices']) - 4)) + ([0] * 4)
 
         operations = []
 
-        # Pour chaque étape
-        for l in range(numStep-1,-1,-1):
+        compteur = 0
 
+        # Pour chaque étape
+        while 1 in status_vertices:
+            print("status = ",status_vertices)
+            print("compteur = ", compteur)
+            #input()
             # if l == 0:
             #     print("At l == 0, faces with 474",currentMesh.getFacesWithVertex(474))
 
-            currentMesh.currentStep = l
-            verticesToRemove = self.getVerticesToRemove(verticesInMesh, mesh=currentMesh,maxNeighborsNum = maxNeighborsNum)
+            currentMesh.currentStep = compteur
+            verticesToRemove = self.getVerticesToRemove(status_vertices, mesh=currentMesh,maxNeighborsNum = maxNeighborsNum)
 
             i = 0
 
@@ -258,7 +269,7 @@ class MapsModel(obja.Model):
                 # if printer:print('1')
 
                 vertexToRemove = verticesToRemove[0]
-                verticesInMesh[vertexToRemove] = 0
+                status_vertices[vertexToRemove] = 0
                 # print("VERTEX")
                 # print(vertexToRemove)
                 # if vertexToRemove==454:
@@ -385,6 +396,8 @@ class MapsModel(obja.Model):
 
             # On ajoute la liste des opérations du l-ième malliage à la liste globale
             operations.append(operations_l)
+
+            compteur += 1
 
         # On ajoute dans la liste des opérations globale, la liste des opérations nécessaires pour
         # retrouver le maillage de base : "Base Domain" 

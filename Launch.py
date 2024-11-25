@@ -11,9 +11,9 @@ def main():
     Runs the program on the model given as parameter.
     """
     np.seterr(invalid = 'raise')
-    L = 4
-    model = MapsModel.MapsModel(L)
-    model.parse_file('./example/suzanne.obj')
+    L = 16
+    model = MapsModel.MapsModel('./example/suzanne.obj')
+    #model.parse_file('./example/suzanne.obj')
 
     finestMesh = model.model2Mesh()
 

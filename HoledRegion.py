@@ -218,8 +218,10 @@ class HoledRegion:
 
         newEdges = []
         newFaces = []
-
-        if len(self.starEdges) > 1:
+        #print(self.vertexToRemove)
+        #print(self.starEdges)
+        #print(self.starVertices)
+        if len(self.starEdges) > 1 and len(self.starVertices) > 2:
             if self.isBoundary:
                 boundaryEdge = tuple(sorted([self.starVertices[0], self.starVertices[-1]]))
                 if boundaryEdge not in self.starEdges: # a priori inutile
@@ -254,7 +256,7 @@ class HoledRegion:
 
                 # if self.vertexToRemove==74:
                 #     self.plotPolygonWithAngles(points, internalAngles)
-            # print(self.starVertices)
+            #print(self.starVertices)
             newFaces.append(tuple(sorted([self.starVertices[0], self.starVertices[1], self.starVertices[2]])))
 
         return newEdges, newFaces
