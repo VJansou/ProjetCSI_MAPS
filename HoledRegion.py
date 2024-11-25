@@ -1,9 +1,7 @@
-
 import numpy as np
 
 class HoledRegion:
     def __init__(self, vertex_to_remove, maps_model):
-        from MapsModel import MapsModel
         self.vertex_to_remove = vertex_to_remove
         self.maps_model = maps_model
         self.star_external_edges = self.maps_model.get_star_external_edges(vertex_to_remove)
@@ -44,13 +42,16 @@ class HoledRegion:
 
         # On calcule les distances des points par rapport au sommet à supprimer (les r du papier)
         r_k = np.zeros(len(self.star_vertices))
+        #DEBUG
+        if len(r_k) != len(theta_k):
+            print(self.is_boundary, self.star_vertices, self.vertex_to_remove, star_faces)
         p_i = self.maps_model.vertices[self.vertex_to_remove]
         for idx, vertex in enumerate(self.star_vertices):
             p_jk = self.maps_model.vertices[vertex]
             r_k[idx] = np.linalg.norm(p_jk - p_i)
         
         # On calcule les coordonnées des points dans la conformal map
-        mu_k = np.zeros(len(self.star_vertices),2)
+        mu_k = np.zeros((len(self.star_vertices),2))
         mu_k[:,0]  = r_k**a * np.cos(theta_k * a)
         mu_k[:,1]  = r_k**a * np.sin(theta_k * a)
 

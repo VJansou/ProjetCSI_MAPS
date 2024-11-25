@@ -12,6 +12,7 @@ def main():
 
     # On calcule l'objet compressé
     operations = maps_model.compute_mesh_hierarchy()
+    operations.reverse()
 
     # On récupère le MapsModel compressé
     mesh_hierarchy = maps_model.liste_simplicies
@@ -28,15 +29,16 @@ def main():
         with open(filename, 'w+') as output:
             # Write the result in output file
             output_model = obja.Output(output, random_color=True)
+            
 
             faces = []
 
             for (l,operations_l) in enumerate(operations):
-                #print("l = ", l)
+                # #print("l = ", l)
                 if l > compression_level:
                     break
-
                 for (ty, index, value) in operations_l:
+                    print(ty, index, value)
                     if ty == "vertex":
                         output_model.add_vertex(index, value)
                     elif ty == "face":

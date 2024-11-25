@@ -26,7 +26,11 @@ class MapsModel(obja.Model):
         """
         liste_faces = []
         for face in self.faces:
+            #DEBUG on regarde si une face contient 0
+            if 0 in [face.a, face.b, face.c]:
+                print("face = ", face)
             liste_faces.append(tuple(sorted([face.a, face.b, face.c])))
+            liste_faces = list(set(liste_faces))
         return liste_faces
 
     def create_edges_list(self):
@@ -57,13 +61,23 @@ class MapsModel(obja.Model):
         """
         Initialise le dictionnaire des feature edges.
         """
+        #DEBUG on va print tout les angles diedres dans un ableau, et aussi la moyenne
+            # creation du tableau des angles diedres
+        angles = []
         for index, edge in enumerate(self.edges):
             v0, v1 = edge
+            angles.append(self.compute_angle_diedre(v0, v1))
+
             # On met les arêtes avec un angle diedre inférieur à treshold_angle comme feature edges
             # Remarque : on calcule la distance de l'angle diedre à pi pour éviter les problèmes de périodicité
             if np.abs(np.pi - self.compute_angle_diedre(v0, v1)) > treshold_dihedral_angle:
                 self.status_edges[index] = 0 # Marque l'arête comme feature edge
-        print("après initialize_feature_edges",self.status_edges.values())
+        # print("angles = ", angles)
+        # print("moyenne = ", np.mean(angles))
+        # # Affiche un histogramme des angles diedres
+        # import matplotlib.pyplot as plt
+        # plt.hist(angles, bins=100)
+        # plt.show()
 
     def intitialize_status_vertices(self, treshold_curvature=np.pi):
         """
@@ -75,22 +89,21 @@ class MapsModel(obja.Model):
             #     self.status_vertices[index] = 0
             # On met les sommets avec une courbure supérieure à treshold_curvature comme unremovable
             if self.compute_curvature_star(index) > treshold_curvature:
-                print("ici")
                 self.status_vertices[index] = 0
-            # On met les sommets qui sont associées à au moins 2 feature edges comme unremovable
-            elif len([edge for edge in self.edges if index in edge and self.status_edges[self.edges.index(edge)] == 0]) >= 2:
-                self.status_vertices[index] = 0
-                print("là")
-        print("après intitialize_status_vertices",self.status_vertices.values())
+            # # On met les sommets qui sont associées à au moins 2 feature edges comme unremovable
+            # elif len([edge for edge in self.edges if index in edge and self.status_edges[self.edges.index(edge)] == 0]) >= 2:
+            #     self.status_vertices[index] = 0
+        print("status_vertices = ", self.status_vertices)
 
     def initialize_liste_simplicies(self):
         """
         Initialise les simplicies.
         """
         simplicies = {'vertices':[],'edges':[],'faces':[]}
-        simplicies['vertices'] = [_ for _ in range(1,len(self.vertices))] # Contient les indices des sommets
+        simplicies['vertices'] = [_ for _ in range(len(self.vertices))] # Contient les indices des sommets
         simplicies['edges'] = self.edges
         simplicies['faces'] = self.liste_faces
+        print("vertices de simplicies = ", simplicies['vertices'])
         return simplicies
         
 
@@ -128,6 +141,8 @@ class MapsModel(obja.Model):
         """
         external_edges = []
         star = self.get_star_faces(central_vertex)
+        #DEBUG if central_vertex == 70:
+        #     print("startot = ", star)
         for face in star:
             external_edges.append(tuple(vertex for vertex in face if vertex != central_vertex))
         return external_edges
@@ -151,7 +166,10 @@ class MapsModel(obja.Model):
         # On récupère un bord de l'étoile s'il existe : 
         # cela permet de partir d'un sommet sur le bord s'il y en a un et donc de s'assurer de parcourir toute l'étoile
         current_vertex = next((vertex for vertex, neighbour_list in neighbours.items() if len(neighbour_list) == 1), None)
-        
+        #DEBUG print("current_vertex = ", current_vertex)
+        # if central_vertex == 70:
+        #     print("star_external_edges = ", star_external_edges)
+        #     print("neighbours = ", neighbours)
         if current_vertex is None: # S'il n'y a pas de bord
             # On prend un sommet quelconque de l'étoile
             current_vertex = star_external_edges[0][0]
@@ -228,7 +246,7 @@ class MapsModel(obja.Model):
         """
         faces = self.get_faces_from_edge((v0, v1))
         if len(faces) != 2:
-            return 0
+            return np.pi
         normal_0 = np.cross(self.vertices[faces[0][1]] - self.vertices[faces[0][0]], self.vertices[faces[0][2]] - self.vertices[faces[0][0]])
         normal_1 = np.cross(self.vertices[faces[1][1]] - self.vertices[faces[1][0]], self.vertices[faces[1][2]] - self.vertices[faces[1][0]])
         return np.arccos(np.clip(np.dot(normal_0, normal_1) / (np.linalg.norm(normal_0) * np.linalg.norm(normal_1)), -1, 1))
@@ -240,9 +258,9 @@ class MapsModel(obja.Model):
         """
         # On récupère les sommets removable
         vertices_to_remove = []
-        for status_vertex in enumerate(self.status_vertices):
-            if status_vertex == 1 and len(self.get_neighbours(status_vertex)) <= max_neighbours:
-                vertices_to_remove.append(status_vertex)
+        for vertex, status_vertex in self.status_vertices.items():
+            if status_vertex == 1 and len(self.get_neighbours(vertex)) <= max_neighbours:
+                vertices_to_remove.append(vertex)
 
         # S'il n'y a pas de sommets removable, on renvoie une liste vide
         if not vertices_to_remove:
@@ -259,7 +277,6 @@ class MapsModel(obja.Model):
 
         # On trie les sommets à enlever par ordre de priorité
         vertices_to_remove = [vertex for _, vertex in sorted(zip(weights, vertices_to_remove), reverse=True)]
-
         return vertices_to_remove
 
     def compute_mesh_hierarchy(self, max_neighbours=12, lambda_=0.5):
@@ -303,7 +320,7 @@ class MapsModel(obja.Model):
                 new_edges, new_faces = holed_region.compute_new_edges_and_faces()
 
                 # On enlève le sommet des simplicies
-                simplicies['vertices'].remove(vertex_to_remove)
+                # simplicies['vertices'].remove(vertex_to_remove)
                 # On enlève les arêtes associées à ce sommet dans les simplicies
                 simplicies['edges'] = [edge for edge in simplicies['edges'] if vertex_to_remove not in edge]
                 # On enlève les faces associées à ce sommet dans les simplicies
@@ -338,8 +355,7 @@ class MapsModel(obja.Model):
             # On ajoute les opérations pour ce niveau à la liste des opérations
             operations.append(operations_l)
         
-            # On met à jour les feature edges et les sommets unremovable
-        print("toto",self.status_vertices.values())
+            #TODO On met à jour les feature edges et les sommets unremovable
         
         # On est au coarsest mesh : on ajoute les operations pour ce niveau à la liste des opérations
         operations_cm = []
@@ -347,9 +363,6 @@ class MapsModel(obja.Model):
             operations_cm.append(('face', 0, obja.Face(face[0],face[1],face[2])))
 
         for vertex in self.liste_simplicies[-1]['vertices']:
-            vertex -= 1
-            # print("vertex = ", vertex)
-            # print("self.vertices[vertex] = ", self.vertices[vertex])
             operations_cm.append(('vertex', vertex, self.vertices[vertex]))
 
         operations.append(operations_cm)
@@ -357,7 +370,7 @@ class MapsModel(obja.Model):
         # On met le sens des opérations à l'envers
         for operation in operations:
             operation.reverse()
-        
+
         return operations
 
 
@@ -366,9 +379,6 @@ class MapsModel(obja.Model):
         Transforme les simplicies en modèle.
         """
         model = decimate.Decimater()
-        # print("simplicies[vertices] = ", simplicies['vertices'])
-        # print(len(self.vertices))
-        # print(len(simplicies['vertices']))
         model.vertices = [self.vertices[idx] for idx in simplicies['vertices']]
         model.faces = []
         i = 0

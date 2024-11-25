@@ -4,8 +4,6 @@ import sys
 import numpy as np
 import random
 
-from typing import List
-
 """
 obja model for python.
 """
@@ -333,7 +331,16 @@ class Output:
         ),
             file=self.output
         )
-
+    
+    def delete_face(self, index):
+        """
+        Changes the indices of the vertices of the specified face.
+        """
+        print('df {}'.format(
+            self.face_mapping[index] + 1
+        ),
+            file=self.output
+        )
 
 def main():
     if len(sys.argv) == 1:
