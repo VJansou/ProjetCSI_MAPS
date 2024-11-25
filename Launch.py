@@ -11,7 +11,7 @@ def main():
     Runs the program on the model given as parameter.
     """
     np.seterr(invalid = 'raise')
-    L = 16
+    L = -1
     model = MapsModel.MapsModel('./example/suzanne.obj')
     #model.parse_file('./example/suzanne.obj')
 
@@ -30,8 +30,8 @@ def main():
 
     #model.getRetriangulation(mesh=finestMesh,vertexToRemove=0)
 
-    meshHierarchy,operations = model.getMeshHierarchy(initialMesh=finestMesh,maxNeighborsNum=12)
-
+    meshHierarchy,operations, L = model.getMeshHierarchy(initialMesh=finestMesh,maxNeighborsNum=12)
+    print("L = ", L)
     operations.reverse()
     
     back2model = meshHierarchy[-1].mesh2model()

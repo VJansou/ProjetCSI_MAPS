@@ -188,8 +188,36 @@ class MapsModel(obja.Model):
                 maxCurvature = starCurvature
 
         return areas,maxArea,curvatures,maxCurvature
+    
+    def get_faces_from_edge(self, mesh:Mesh, edge):
+        """
+        Renvoie les faces qui contiennent une arête.
+        """
+        faces = []
+        compteur = 0 # Il ne peut y avoir que 2 faces qui contiennent une arête
+        for face in mesh.simplicies['faces']:
+            if edge[0] in face and edge[1] in face:
+                faces.append(face)
+                compteur += 1
+            if compteur == 2:
+                break
+        return faces
+    
+    def compute_angle_diedre(self, mesh:Mesh, v0, v1):
+        """
+        Calcule l'angle diedre entre deux sommets.
+        """
+        faces = self.get_faces_from_edge(mesh, (v0, v1))
+        #print("faces = ", faces)
+        if len(faces) != 2:
+            return np.pi
+        normal_0 = np.cross(mesh.points[faces[0][1]] - mesh.points[faces[0][0]], mesh.points[faces[0][2]] - mesh.points[faces[0][0]])
+        normal_1 = np.cross(mesh.points[faces[1][1]] - mesh.points[faces[1][0]], mesh.points[faces[1][2]] - mesh.points[faces[1][0]])
+        print(np.arccos(np.clip(np.dot(normal_0, normal_1) / (np.linalg.norm(normal_0) * np.linalg.norm(normal_1)), -1, 1)))
+        return np.arccos(np.clip(np.dot(normal_0, normal_1) / (np.linalg.norm(normal_0) * np.linalg.norm(normal_1)), -1, 1))
+        
 
-    def getVerticesToRemove(self, status_vertices, mesh:Mesh,maxNeighborsNum:int=12,_lambda:float= 1/2,threshold_curv=np.pi) -> List[int]:
+    def getVerticesToRemove(self, status_vertices, mesh:Mesh,maxNeighborsNum:int=12,_lambda:float= 1/2,threshold_curv=np.pi, threshold_dihedral_angle=3*np.pi/4) -> List[int]:
 
         # print("Vertices to remove computation")
         
@@ -204,17 +232,22 @@ class MapsModel(obja.Model):
         areas,maxArea,curvatures,maxCurvature = self.getAreasAndCurvatures(mesh=mesh,selectedVertices=selectedVertices)
 
         supressionOrder = []
-        print(curvatures)
-        print(threshold_curv)
+        #print(curvatures)
+        #print(threshold_curv)
         
         for indx,vertex in enumerate(selectedVertices):
-            if curvatures[indx,0] > threshold_curv:
+            star_vertices, _ = self.getExternalVerticesInCyclicOrder(vertex)
+            #print(star_vertices)
+            #print(vertex)
+            nb_feature_edges =  sum(1 for neigh_vertex in star_vertices if np.abs(np.pi - self.compute_angle_diedre(mesh, neigh_vertex, vertex)) > threshold_dihedral_angle)
+
+            if nb_feature_edges >= 2 or curvatures[indx,0] <= threshold_curv:
+                ind_abs = mesh.simplicies['vertices'].index(vertex) if vertex in mesh.simplicies['vertices'] else -1
+                if ind_abs != -1:
+                    status_vertices[ind_abs] = 0
+            else:
                 weight = _lambda * areas[indx,0]/maxArea + (1-_lambda) * curvatures[indx,0]/maxCurvature
                 supressionOrder.append([vertex,weight])
-            else:
-                for ind_abs, vertex_abs in enumerate(mesh.simplicies['vertices']):
-                    if vertex_abs == vertex:
-                        status_vertices[ind_abs] = 0
 
 
         supressionOrder.sort(key=lambda x: x[1],reverse=True)
@@ -423,7 +456,7 @@ class MapsModel(obja.Model):
         for operation in operations:
             operation.reverse()
 
-        return meshHierarchy,operations
+        return meshHierarchy,operations, compteur
     
 
     
