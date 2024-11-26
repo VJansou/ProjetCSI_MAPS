@@ -171,8 +171,8 @@ class MapsModel(obja.Model):
             starCurvature = 0
 
             for face in facesWithVertex:
-                if -np.inf in mesh.points[face[0]] or -np.inf in mesh.points[face[1]] or -np.inf in mesh.points[face[2]]:
-                    print(face)
+                #if -np.inf in mesh.points[face[0]] or -np.inf in mesh.points[face[1]] or -np.inf in mesh.points[face[2]]:
+                    #print(face)
                 starArea = starArea + self.computeArea(p0=mesh.points[face[0]],p1=mesh.points[face[1]],p2=mesh.points[face[2]])
                 face_copy = list(face)
                 face_copy.remove(vertex)
@@ -213,11 +213,11 @@ class MapsModel(obja.Model):
             return np.pi
         normal_0 = np.cross(mesh.points[faces[0][1]] - mesh.points[faces[0][0]], mesh.points[faces[0][2]] - mesh.points[faces[0][0]])
         normal_1 = np.cross(mesh.points[faces[1][1]] - mesh.points[faces[1][0]], mesh.points[faces[1][2]] - mesh.points[faces[1][0]])
-        print(np.arccos(np.clip(np.dot(normal_0, normal_1) / (np.linalg.norm(normal_0) * np.linalg.norm(normal_1)), -1, 1)))
+        #print(np.arccos(np.clip(np.dot(normal_0, normal_1) / (np.linalg.norm(normal_0) * np.linalg.norm(normal_1)), -1, 1)))
         return np.arccos(np.clip(np.dot(normal_0, normal_1) / (np.linalg.norm(normal_0) * np.linalg.norm(normal_1)), -1, 1))
         
 
-    def getVerticesToRemove(self, status_vertices, mesh:Mesh,maxNeighborsNum:int=12,_lambda:float= 1/2,threshold_curv=np.pi, threshold_dihedral_angle=3*np.pi/4) -> List[int]:
+    def getVerticesToRemove(self, status_vertices, mesh:Mesh,maxNeighborsNum:int=12,_lambda:float= 1/2,threshold_curv=np.pi, threshold_dihedral_angle=np.pi/24) -> List[int]:
 
         # print("Vertices to remove computation")
         
@@ -239,7 +239,7 @@ class MapsModel(obja.Model):
             star_vertices, _ = self.getExternalVerticesInCyclicOrder(vertex)
             #print(star_vertices)
             #print(vertex)
-            nb_feature_edges =  sum(1 for neigh_vertex in star_vertices if np.abs(np.pi - self.compute_angle_diedre(mesh, neigh_vertex, vertex)) > threshold_dihedral_angle)
+            nb_feature_edges =  sum(1 for neigh_vertex in star_vertices if np.abs(self.compute_angle_diedre(mesh, neigh_vertex, vertex)) < threshold_dihedral_angle)
 
             if nb_feature_edges >= 2 or curvatures[indx,0] <= threshold_curv:
                 ind_abs = mesh.simplicies['vertices'].index(vertex) if vertex in mesh.simplicies['vertices'] else -1
@@ -273,7 +273,7 @@ class MapsModel(obja.Model):
 
         currentMesh:Mesh = initialMesh
 
-        status_vertices = ([1] * (len(currentMesh.simplicies['vertices']) - 4)) + ([0] * 4)
+        status_vertices = ([1] * (len(currentMesh.simplicies['vertices'])))
 
         operations = []
 
@@ -289,7 +289,8 @@ class MapsModel(obja.Model):
 
             currentMesh.currentStep = compteur
             verticesToRemove = self.getVerticesToRemove(status_vertices, mesh=currentMesh,maxNeighborsNum = maxNeighborsNum)
-
+            if verticesToRemove == []:
+                break
             i = 0
 
             operations_l = []

@@ -42,7 +42,7 @@ def main():
     # model2 = decimate.Decimater()
     # model2.parse_file('example/suzanne.obj')
 
-    with open('example/suzanne_compresse.obja', 'w+') as output2:
+    with open('example/suzanne_compresse36.obja', 'w+') as output2:
         back2model.contract(output2)
 
 
