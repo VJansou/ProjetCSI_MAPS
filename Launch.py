@@ -1,7 +1,5 @@
 import numpy as np
 import MapsModel
-
-import decimate
 import obja
 import pandas as pd
 from decimate import Decimater

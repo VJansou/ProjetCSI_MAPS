@@ -1,14 +1,18 @@
 from typing import List,Dict
-import matplotlib.pyplot as plt
 import numpy as np
 import plotly.graph_objects as go
-# import pandas as pd
 import copy
 import obja
 import decimate
 
 class Mesh:
+    """
+    Classe représentant un maillage 3D pour une étape.
+    """
     def __init__(self,stepNum:int):
+        """
+        Intialise un objet Mesh.
+        """
         self.stepNum = stepNum
         self.currentStep = stepNum
         self.points:List[np.ndarray] = []
@@ -16,10 +20,18 @@ class Mesh:
         self.neighbors = {}
     
     def copy(self):
-        # Créer une copie de l'objet Mesh
+        """
+        Retourne une copie de l'objet Mesh.
+        """
         return copy.deepcopy(self)  # Remplace par une copie réelle des attributs de Mesh
     
     def createNeighborsDict(self):
+        """
+            Crée un dictionnaire des voisins de chaque sommet du maillage.
+
+            Returns : Dict[int,List[int]], le dictionnaire des voisins, un voisin étant une liste d'entiers : 
+                        les indices associés aux sommets voisins.
+        """
         self.neighbors = {}
         for vertex in self.simplicies['vertices']:
             self.neighbors[vertex] = []
@@ -29,25 +41,26 @@ class Mesh:
         return self.neighbors
 
 
-    """
+    def getNumberOfNeighbors(self,vertexId:int) -> int:
+        """
         Retourne le nombre de voisin d'un sommet du maillage ( = card(1-Ring) ).
 
         Args : vertexId:int, l'indice associé au sommet en question.
         
         Returns : int, le nombre de voisins.
-    """
-    def getNumberOfNeighbors(self,vertexId:int) -> int:
+        """
         return len(self.neighbors[vertexId])
     
-    """
+
+    def getEdgesWithVertex(self,vertexId):
+        """
         Retourne la liste des arrêtes du maillage contenant un certain sommet.
 
         Args : vertexId:int, l'indice associé au sommet en question.
         
         Returns : List[List[int]], la liste des arrêtes, une arrête étant une liste de deux entiers : 
                     les indices associés aux deux sommets de l'arrête.
-    """
-    def getEdgesWithVertex(self,vertexId):
+        """
         edges = []
         for vertex in self.neighbors[vertexId]:
             if vertex < vertexId:
@@ -57,25 +70,27 @@ class Mesh:
 
         return edges
     
-    """
+
+    def getNeighbors(self,vertexId:int) -> List[int]:
+        """
         Retourne la liste des sommets voisins d'un certain sommet ( = sommet du 1-ring d'un sommet).
 
         Args : vertexId:int, l'indice associé au sommet en question.
         
         Returns : List[int], la liste des indices associés sommets.
-    """
-    def getNeighbors(self,vertexId:int) -> List[int]:
+        """
         return self.neighbors[vertexId]
 
-    """
+    
+    def getFacesWithVertex(self, vertexId):
+        """
         Retourne la liste des faces du maillage contenant un certain sommet.
 
         Args : vertexId:int, l'indice associé au sommet en question.
         
         Returns : List[List[int]], la liste des faces, une face étant une liste de trois entiers : 
                     les indices associés trois aux sommets de la face.
-    """
-    def getFacesWithVertex(self, vertexId):
+        """
         faces = set()
         for face in self.simplicies['faces']:
             if face[0] == vertexId or face[1] == vertexId or face[2] == vertexId:
@@ -83,15 +98,16 @@ class Mesh:
                 faces.add(tuple(face))
         return list(faces)
     
-    """
+
+    def get1RingExternalEdges(self,centralVertex:int) -> List[List[int]]:
+        """
         Retourne la liste des arrêtes extérieures du 1-ring d'un sommet.
 
         Args : centralVertex:int, l'indice associé au sommet en question.
         
         Returns : List[List[int]], la liste des arrêtes, une arrête étant une liste de deux entiers : 
                     les indices associés aux deux sommets de l'arrête.
-    """
-    def get1RingExternalEdges(self,centralVertex:int) -> List[List[int]]:
+        """
 
         facesWithCentralVertex = self.getFacesWithVertex(vertexId=centralVertex)
         externalEdges = []
@@ -101,52 +117,65 @@ class Mesh:
         
         return externalEdges
 
-    """
-        Retourne la liste des voisins d'un sommet dans.
+
+    def getExternalVerticesInCyclicOrder(self,vertexId:int):
+        """
+        Retourne la liste des voisins d'un sommet dans l'ordre cyclique.
 
         Args : centralVertex:int, l'indice associé au sommet en question.
         
         Returns : List[List[int]], la liste des arrêtes, une arrête étant une liste de deux entiers : 
                     les indices associés aux deux sommets de l'arrête.
-    """
-    def getExternalVerticesInCyclicOrder(self,vertexId:int):
+        """
 
         isBorderVertex = False
         edgesInOrder = []
+        # On récupère les arrêtes extérieures du 1-ring du sommet
         edges = self.get1RingExternalEdges(vertexId)
+
+        # On crée un dictionnaire des voisins de chaque sommet
         neighbors = {}
         for edge in edges:
             neighbors.setdefault(edge[0], []).append(edge[1])
             neighbors.setdefault(edge[1], []).append(edge[0])
 
+        # On récupère un bord de l'étoile s'il existe : 
+        # cela permet de partir d'un sommet sur le bord s'il y en a un et donc de s'assurer de parcourir toute l'étoile
         currentVertex = next((vertex for vertex, neighborList in neighbors.items() if len(neighborList) == 1), None)
-        if currentVertex is None:
+        if currentVertex is None: # S'il n'y a pas de bord, on prend un sommet quelconque
             if len(edges) > 0:
                 currentVertex = edges[0][0]
         else:
             isBorderVertex = True
-        
+        # On ajoute le sommet de départ à la liste des sommets
         edgesInOrder.append(currentVertex)
+
+        # On parcourt les sommets voisins dans l'ordre cyclique
         while True:
+            # On récupère les voisins du sommet courant
             neighborList = neighbors[currentVertex]
+            # On récupère le prochain sommet à parcourir
             nextVertex = next((v for v in neighborList if v not in edgesInOrder), None)
+            # Si on a parcouru tous les sommets, on arrête
             if nextVertex is None:  
                 break
             
+            # On ajoute le sommet à la liste des sommets
             edgesInOrder.append(nextVertex)
+
+            # On passe au sommet suivant
             currentVertex = nextVertex
 
         return edgesInOrder, isBorderVertex
                    
-    """
+    
+
+    def plot(self, title: str, zoomPoint: np.ndarray = None) -> None:
+        """
         Affiche dans une fenêtre de matplotlib le maillage. La figure affiché est une figure 2D
 
         Args : title:str, le titre de la figure.
-        
-        Returns : None
-    """
-
-    def plot(self, title: str, zoomPoint: np.ndarray = None) -> None:
+        """
         points = self.points
 
         # Nettoyer les points infiniment grands
@@ -196,23 +225,21 @@ class Mesh:
         fig.show()
 
     def mesh2model(self) -> decimate.Decimater:
+        """
+        Convertit un maillage en un modèle.
+        """
         # création d'un nouveau modèle
         model = decimate.Decimater()
         
         # ajouter les sommets du maillage au modèle
         model.vertices = [point for point in self.points]
+
+        # ajouter les faces du maillage au modèle
         model.faces = []
-        
-        i = 0
-        vrai = True
         for face in self.simplicies['faces']:
-            if vrai:
-                i+=1
-                if face[1] == 252:
-                    vrai = False
-            # print(f"face n{i}",face)
             model.faces.append(obja.Face(a=face[0], b=face[1], c=face[2]))
         
+        # définir le nombre de lignes du modèle
         model.line = len(model.vertices) + len(model.faces)
 
         return model
