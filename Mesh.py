@@ -37,10 +37,6 @@ class Mesh:
         Returns : int, le nombre de voisins.
     """
     def getNumberOfNeighbors(self,vertexId:int) -> int:
-        #print(vertexId)
-        #print("neigh = ")
-        #print(self.neighbors[vertexId])
-        #print('\n')
         return len(self.neighbors[vertexId])
     
     """
@@ -53,7 +49,6 @@ class Mesh:
     """
     def getEdgesWithVertex(self,vertexId):
         edges = []
-        #print(self.neighbors)
         for vertex in self.neighbors[vertexId]:
             if vertex < vertexId:
                 edges.append((vertex, vertexId))
@@ -81,24 +76,9 @@ class Mesh:
                     les indices associés trois aux sommets de la face.
     """
     def getFacesWithVertex(self, vertexId):
-        # faces = set()
-        # neighbors = self.neighbors[vertexId]
-        # # if vertexId==103:
-        # #     print("neighbors of",vertexId," ",neighbors)
-        # for neighbor in neighbors:
-        #     subNeighbors = self.neighbors[neighbor]
-        #     for subNeighbor in subNeighbors:
-        #         if subNeighbor in neighbors:
-        #             face = sorted([vertexId, neighbor, subNeighbor])
-        #             faces.add(tuple(face))
-        # return list(faces)
-
         faces = set()
         for face in self.simplicies['faces']:
             if face[0] == vertexId or face[1] == vertexId or face[2] == vertexId:
-                # if np.inf in self.points[face[0]] or np.inf in self.points[face[0]] or np.inf in self.points[face[0]]:
-                #     print("face problematique ",face)
-                #     input()
                 face = sorted(face)
                 faces.add(tuple(face))
         return list(faces)
@@ -192,8 +172,6 @@ class Mesh:
                     edges_y += [points[face[i], 1], points[face[j], 1], None]
                     edges_z += [points[face[i], 2], points[face[j], 2], None]
 
-        #print("POINTS")
-        #print(points)
         # Tracer les points
         point_trace = go.Scatter3d(
             x=points[:, 0], y=points[:, 1], z=points[:, 2],
@@ -222,26 +200,9 @@ class Mesh:
         model = decimate.Decimater()
         
         # ajouter les sommets du maillage au modèle
-        model.vertices = [point for point in self.points]# if not np.array_equal(point, np.array([-np.inf, -np.inf, -np.inf]))]
-        # print("vertices",model.vertices)
-        # print("taille vertices",len(model.vertices))
-        # créer un dictionnaire pour conserver l'indexation des sommets (afin de gérer les points supprimés)
-        # index_mapping = {}
-        # index_counter = 0
-        # for i, point in enumerate(mesh.points):
-        #     if not np.array_equal(point, np.array([-np.inf, -np.inf, -np.inf])):
-        #         index_mapping[i] = index_counter
-        #         index_counter += 1
-        
-        # ajouter les faces en utilisant la nouvelle indexation
-        # model.faces = []
-        # for face in mesh.simplicies['faces']:
-        #     # remap les indices de sommet pour chaque face
-        #     new_face = [index_mapping[vertex] for vertex in face if vertex in index_mapping]
-        #     if len(new_face) == 3:
-        #         model.faces.append(new_face)
+        model.vertices = [point for point in self.points]
         model.faces = []
-        # print("nombre de faces",len(self.simplicies['faces']))
+        
         i = 0
         vrai = True
         for face in self.simplicies['faces']:
@@ -253,12 +214,5 @@ class Mesh:
             model.faces.append(obja.Face(a=face[0], b=face[1], c=face[2]))
         
         model.line = len(model.vertices) + len(model.faces)
-        # # mise en forme des arrêtes du maillage
-        # model.edges = []
-        # for edge in mesh.simplicies['edges']:
-        #     # Remap les indices de sommet pour chaque arrête
-        #     new_edge = [index_mapping[vertex] for vertex in edge if vertex in index_mapping]
-        #     if len(new_edge) == 2:
-        #         model.edges.append(new_edge)
 
         return model
