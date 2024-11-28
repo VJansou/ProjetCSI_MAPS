@@ -5,6 +5,7 @@ from Mesh import Mesh
 from typing import List
 import decimate
 import obja
+import pandas as pd
 
 def main():
     """
@@ -30,9 +31,10 @@ def main():
 
     #model.getRetriangulation(mesh=finestMesh,vertexToRemove=0)
 
-    meshHierarchy,operations, L = model.getMeshHierarchy(initialMesh=finestMesh,maxNeighborsNum=12)
+    meshHierarchy,operations, L, operations_old = model.getMeshHierarchy(initialMesh=finestMesh,maxNeighborsNum=12)
     print("L = ", L)
     operations.reverse()
+    operations_old.reverse()
     
     back2model = meshHierarchy[-1].mesh2model()
     # model = decimate.Decimater()
@@ -45,7 +47,44 @@ def main():
     with open('example/suzanne_compresse36.obja', 'w+') as output2:
         back2model.contract(output2)
 
+    file_weight_old = []
+    for compression_level in range(0,L+1):
+        filename = 'example/suzanne_decompresse_old_'+str(compression_level)+'.obja'
+        with open(filename, 'w+') as output:
+            # back2model.contract(output)
+            # Write the result in output file
+            output_model = obja.Output(output, random_color=True)
 
+            # for (i,operation) in enumerate(operations[0]):
+            #     print("operation ",i," : ",operation)
+
+            faces = []
+            level_weight_old = 0 # octets
+
+            for (l,operations_l_old) in enumerate(operations_old):
+                #print("l = ", l)
+                if l > compression_level:
+                    break
+
+                for (ty, index, value) in operations_l_old:
+                    if ty == "vertex":
+                        output_model.add_vertex(index, value)
+                        level_weight_old += 13 # 1 + 4 + 4 + 4
+                    elif ty == "face":
+                        if value not in faces:
+                            faces.append((value.a, value.b, value.c))
+                            output_model.add_face(len(faces)-1, value)
+                            level_weight_old += 4 # 1 + 1 + 1 + 1
+                    elif ty == "new_face":
+                        index = faces.index((value.a, value.b, value.c))
+                        if index != -1:
+                            output_model.delete_face(index)
+                            level_weight_old -= 4 # 1 + 1 + 1 + 1
+                    #else:
+                    #    output_model.edit_vertex(index, value)
+        file_weight_old.append(level_weight_old)
+
+    file_weight = []
     for compression_level in range(0,L+1):
         filename = 'example/suzanne_decompresse_'+str(compression_level)+'.obja'
         with open(filename, 'w+') as output:
@@ -57,6 +96,7 @@ def main():
             #     print("operation ",i," : ",operation)
 
             faces = []
+            level_weight = 0 # octets
 
             for (l,operations_l) in enumerate(operations):
                 #print("l = ", l)
@@ -66,16 +106,33 @@ def main():
                 for (ty, index, value) in operations_l:
                     if ty == "vertex":
                         output_model.add_vertex(index, value)
+                        level_weight += 13 # 1 + 4 + 4 + 4
                     elif ty == "face":
                         if value not in faces:
                             faces.append((value.a, value.b, value.c))
                             output_model.add_face(len(faces)-1, value)   
+                            level_weight += 4 # 1 + 1 + 1 + 1
                     elif ty == "new_face":
                         index = faces.index((value.a, value.b, value.c))
                         if index != -1:
                             output_model.delete_face(index)
+                            level_weight -= 4 # 1 + 1 + 1 + 1
                     #else:
                     #    output_model.edit_vertex(index, value)
+        file_weight.append(level_weight)
+
+
+
+    # Convert to a DataFrame
+
+
+    data = []
+    data.append(["Ancien OBJA"] + file_weight_old)
+    data.append(["Nouvel OBJA"] + file_weight)
+
+    df = pd.DataFrame(data, index=["", ""], columns=["Poids en octets selon la méthode et le niveau de compression"]+["Niveau "+str(i) for i in range(0,L+1)])
+
+    print(df)
         
 
 if __name__ == '__main__':

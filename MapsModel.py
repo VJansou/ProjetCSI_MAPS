@@ -275,7 +275,10 @@ class MapsModel(obja.Model):
 
         status_vertices = ([1] * (len(currentMesh.simplicies['vertices'])))
 
+        vertices_removed = []
+
         operations = []
+        operations_old = []
 
         compteur = 0
 
@@ -294,6 +297,7 @@ class MapsModel(obja.Model):
             i = 0
 
             operations_l = []
+            operations_l_old = []
 
             # Tant que le maillage courant contient des sommets "supprimables"
             while len(verticesToRemove) != 0:
@@ -343,6 +347,7 @@ class MapsModel(obja.Model):
                 for face in newFaces:
                     if face not in currentMesh.simplicies['faces']:
                         operations_l.append(('new_face',0, obja.Face(face[0],face[1],face[2])))
+                        operations_l_old.append(('new_face',0, obja.Face(face[0],face[1],face[2])))
                         currentMesh.simplicies['faces'].append(face)
 
                 edgesWithSelectedVertex = currentMesh.getEdgesWithVertex(vertexId=vertexToRemove)
@@ -380,6 +385,7 @@ class MapsModel(obja.Model):
 
                         # On ajoute la face supprimée à la liste des opérations du l-ième maillage
                         operations_l.append(('face',0, obja.Face(face[0],face[1],face[2])))
+                        operations_l_old.append(('face',0, obja.Face(face[0],face[1],face[2])))
                         
                         currentMesh.simplicies['faces'].remove(face)
                         # if vertexToRemove==454:
@@ -393,6 +399,9 @@ class MapsModel(obja.Model):
                     if vertex != vertexToRemove:
                         currentMesh.neighbors[vertex].remove(vertexToRemove)
 
+                
+                operations_l.append(('vertex',vertexToRemove, currentMesh.points[vertexToRemove]))
+                vertices_removed.append(vertexToRemove)
                 ######### PHASE DE TEST #########
                 # facesWithSelectedVertex = currentMesh.getFacesWithVertex(vertexId=vertexToRemove)
 
@@ -430,12 +439,14 @@ class MapsModel(obja.Model):
 
             # On ajoute la liste des opérations du l-ième malliage à la liste globale
             operations.append(operations_l)
+            operations_old.append(operations_l_old)
 
             compteur += 1
 
         # On ajoute dans la liste des opérations globale, la liste des opérations nécessaires pour
         # retrouver le maillage de base : "Base Domain" 
         operationBaseDomain = []
+        operationBaseDomain_old = []
         
         baseDomain = currentMesh
 
@@ -443,21 +454,28 @@ class MapsModel(obja.Model):
             # if face[0] == 103 or face[1]==103 or face[2]==103:
             #     print("face, ",face[0]," ",face[1]," ",face[2]," is in base domain")
             operationBaseDomain.append(('face',0, obja.Face(face[0],face[1],face[2])))
+            operationBaseDomain_old.append(('face',0, obja.Face(face[0],face[1],face[2])))
 
         for vertex in baseDomain.simplicies['vertices']:
-            if vertex is not None:
+            if vertex not in vertices_removed:
                 
                 operationBaseDomain.append(('vertex', vertex, baseDomain.points[vertex]))
+            
+            operationBaseDomain_old.append(('vertex', vertex, baseDomain.points[vertex]))
 
         operations.append(operationBaseDomain)
+        operations_old.append(operationBaseDomain_old)
 
         # for operation in operations:
         #     print(operation)
 
         for operation in operations:
             operation.reverse()
+        
+        for operation_old in operations_old:
+            operation_old.reverse()
 
-        return meshHierarchy,operations, compteur
+        return meshHierarchy,operations, compteur, operations_old
     
 
     
