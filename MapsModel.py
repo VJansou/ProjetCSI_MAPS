@@ -8,40 +8,52 @@ from HoledRegion import HoledRegion
 #tests purpose
 import sys
 
-
 class MapsModel(obja.Model):
+    """
+    Sous-classe de obja.Model, permettant de manipuler un modèle 3D à partir d'un fichier .obj.
+    """
     
     def __init__(self,path):
+        """
+        intialise un objet MapsModel.
+        """
         super().__init__()
-        self.L = 4
+        self.L = 0
         super().parse_file(path)
         self.facesToList()
         self.createEdgesList()
         self.createNeighborsDict()
 
-    """
+    
+    def model2Mesh(self) -> Mesh:
+        """
         Retourne le maillage associé à un modèle déduit d'un fichier .obj
-
-        Args: None
-
         Return: Mesh
     """
-    def model2Mesh(self) -> Mesh:
-        finestMesh = Mesh(stepNum=self.L)
+        finestMesh = Mesh()
 
-        # Parcours des sommets du modèle, on récupère l'indice d'un sommet dans self.vertices et son indice grâce à index
+        # Parcours des sommets du modèle, on récupère l'indice d'un sommet dans self.vertices et son indice
         for index,vertex in enumerate(self.vertices):
             coordonates = vertex
             finestMesh.points.append(coordonates)
             finestMesh.simplicies['vertices'].append(index)
 
+        # Parcours des faces du modèle
         finestMesh.simplicies['faces'] = list(set(sorted(self.list_faces)))
+
+        # On ajoute les arrêtes du modèle
         finestMesh.simplicies['edges'] = self.edges
+
+        # On ajoute les voisins de chaque sommet du maillage
         finestMesh.neighbors = self.neighbors
 
         return finestMesh
     
     def facesToList(self):
+        """
+        Crée la liste qui contient les faces sous forme de liste de tuples.
+        Les faces sont triées par ordre croissant de leurs sommets.
+        """
         listFaces = []
         for face in self.faces:
             listFace = sorted([face.a, face.b, face.c])
@@ -49,6 +61,9 @@ class MapsModel(obja.Model):
         self.list_faces = list(set(sorted(listFaces)))
     
     def createEdgesList(self):
+        """
+        Crée la liste qui contient les arrêtes du modèle.
+        """
         self.edges = set()
         for face in self.list_faces:
             self.edges.add((face[0], face[1]))
@@ -58,6 +73,9 @@ class MapsModel(obja.Model):
         return self.edges
     
     def createNeighborsDict(self):
+        """
+        Crée un dictionnaire qui contient les voisins de chaque sommet du modèle.
+        """
         self.neighbors = {}
         for index,_ in enumerate(self.vertices):
             self.neighbors[index] = []
@@ -68,13 +86,18 @@ class MapsModel(obja.Model):
     
     
     def computeArea(self,p0:np.ndarray,p1:np.ndarray,p2:np.ndarray) -> np.ndarray:
+        """
+        Calcule l'aire d'un triangle à partir de ses trois sommets.
+        """
         base = p1 - p0
         milieu_segment = (p0 + p1)/2
-        
         hauteur = p2 - milieu_segment
         return np.linalg.norm(np.cross(base,hauteur)) / 2
     
     def computeCurvature(self,p0:np.ndarray,p1:np.ndarray,p2:np.ndarray) -> float:
+        """
+        Calcule l'angle d'une face à partir de ses trois sommets.
+        """
         # Pour le calcul d'un angle d'une face, on utilise la loi d'Al-Kashi
         p0p1 = np.sqrt(np.sum((p0-p1)**2))
         p1p2 = np.sqrt(np.sum((p1-p2)**2))
@@ -82,6 +105,9 @@ class MapsModel(obja.Model):
         return np.arccos((p0p1**2 + p0p2**2 - p1p2**2)/(2*p0p1*p0p2))
 
     def getAreasAndCurvatures(self,mesh:Mesh,selectedVertices:List[int]) -> Tuple[np.ndarray,float,np.ndarray,float]:
+        """
+        Calcule les aires et les courbures des étoiles des sommets sélectionnés.
+        """
 
         nbVertices = len(selectedVertices)
 
@@ -90,25 +116,26 @@ class MapsModel(obja.Model):
 
         maxArea = -inf
         maxCurvature = -inf
-
+        # Pour chaque sommet sélectionné :
         for indx,vertex in enumerate(selectedVertices):
+            # On récupère les faces qui contiennent le sommet
             facesWithVertex = mesh.getFacesWithVertex(vertexId=vertex)
 
+            # On calcule l'aire et la courbure de l'étoile du sommet
             starArea = 0
             starCurvature = 0
-
             for face in facesWithVertex:
                 starArea = starArea + self.computeArea(p0=mesh.points[face[0]],p1=mesh.points[face[1]],p2=mesh.points[face[2]])
                 face_copy = list(face)
                 face_copy.remove(vertex)
                 starCurvature = starCurvature + self.computeCurvature(p0=mesh.points[vertex],p1=mesh.points[face_copy[0]],p2=mesh.points[face_copy[1]])
-
             areas[indx,0] = starArea
+            starCurvature = 2*np.pi - starCurvature
             curvatures[indx,0] = starCurvature
 
+            # On met à jour les aires et courbures maximales si nécessaire
             if starArea > maxArea:
                 maxArea = starArea
-
             if starCurvature > maxCurvature:
                 maxCurvature = starCurvature
 
@@ -141,44 +168,49 @@ class MapsModel(obja.Model):
         
 
     def getVerticesToRemove(self, status_vertices, mesh:Mesh,maxNeighborsNum:int=12,_lambda:float= 1/2,threshold_curv=np.pi, threshold_dihedral_angle=np.pi/24) -> List[int]:
-
-        
+        """
+        Renvoie la liste des sommets à supprimer pour un niveau de compression dans l'ordre de priorité.
+        """
         selectedVertices = []
-        
+        supressionOrder = []
+
+        # On calcule les aires et les courbures des étoiles des sommets sélectionnés
         for idx, vertex in enumerate(mesh.simplicies['vertices']):
             if status_vertices[idx] == 1:
                 nbNeighbors:int = mesh.getNumberOfNeighbors(vertex)
                 if nbNeighbors <= maxNeighborsNum and nbNeighbors > 0:
                     selectedVertices.append(vertex)
         areas,maxArea,curvatures,maxCurvature = self.getAreasAndCurvatures(mesh=mesh,selectedVertices=selectedVertices)
-
-        supressionOrder = []
         
+        # Pour chaque sommet sélectionné :
         for indx,vertex in enumerate(selectedVertices):
+            # On récupère les sommets voisins du sommet
             star_vertices, _ = mesh.getExternalVerticesInCyclicOrder(vertex)
+            # On calcule le nombre d'arrêtes caractéristiques
             nb_feature_edges =  sum(1 for neigh_vertex in star_vertices if np.abs(self.compute_angle_diedre(mesh, neigh_vertex, vertex)) < threshold_dihedral_angle)
 
-            if nb_feature_edges >= 2 or curvatures[indx,0] <= threshold_curv:
+            # Si le sommet a plus de 2 arrêtes caractéristiques ou si sa courbure est supérieure à un seuil, il n'est pas supprimable
+            if nb_feature_edges >= 2 or curvatures[indx,0] >= threshold_curv:
                 ind_abs = mesh.simplicies['vertices'].index(vertex) if vertex in mesh.simplicies['vertices'] else -1
                 if ind_abs != -1:
                     status_vertices[ind_abs] = 0
+            # Sinon, on calcule le poids du sommet
             else:
                 weight = _lambda * areas[indx,0]/maxArea + (1-_lambda) * curvatures[indx,0]/maxCurvature
                 supressionOrder.append([vertex,weight])
 
-
-        supressionOrder.sort(key=lambda x: x[1],reverse=True)
-
+        # On trie les sommets à supprimer par ordre de priorité
+        supressionOrder.sort(key=lambda x: x[1])
         verticesToRemove = [e[0] for e in supressionOrder]
 
         return verticesToRemove
     
-    """
-        Étant donné un maillage de départ, retourne la liste des maillages jusqu'au "Domain Base".
-    """
-    def getMeshHierarchy(self,initialMesh:Mesh,maxNeighborsNum = 12) -> List[Mesh]:
-        
-        numStep:int = initialMesh.stepNum
+
+    def getMeshHierarchy(self,initialMesh:Mesh,maxNeighborsNum = 12):
+        """
+        Étant donné un maillage de départ, retourne la liste des maillages jusqu'au "Domain Base",
+        la liste des opérations nécessaires pour retrouver chaque maillage de la liste et le nombre d'étapes.
+        """
 
         # Liste des maillages obtenues après les simplifications successives
         meshHierarchy:List[Mesh] = [initialMesh.copy()]

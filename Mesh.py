@@ -9,12 +9,10 @@ class Mesh:
     """
     Classe représentant un maillage 3D pour une étape.
     """
-    def __init__(self,stepNum:int):
+    def __init__(self):
         """
         Intialise un objet Mesh.
         """
-        self.stepNum = stepNum
-        self.currentStep = stepNum
         self.points:List[np.ndarray] = []
         self.simplicies:Dict[List[int]] = {'vertices':[],'edges':[],'faces':[]}
         self.neighbors = {}
